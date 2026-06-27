@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Document(collection = "maintenance_requests")
-public class MaintenanceRequest {
+public class Maintenance {
 
     @Id
     private String id;
