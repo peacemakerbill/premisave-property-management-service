@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: premisave-property-management-service
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/premisave-property}
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH_SERVICE_URL:http://localhost:8080}
+
+server:
+  port: 8081
+
+# API Versioning
+api:
+  version: v1
+
+# Feign Clients
+feign:
+  client:
+    config:
+      default:
+        connect-timeout: 5000
+        read-timeout: 10000
+
+# Logging
+logging:
+  level:
+    com.premisave: DEBUG
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
