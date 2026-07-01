@@ -4,6 +4,10 @@ import com.premisave.property.entity.OccupancyHistory;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface OccupancyHistoryRepository extends MongoRepository<OccupancyHistory, String> {
+
+    List<OccupancyHistory> findByRentalUnitId(String rentalUnitId);
 }
