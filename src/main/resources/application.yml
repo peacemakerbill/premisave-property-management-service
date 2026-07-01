@@ -1,32 +1,58 @@
 spring:
   application:
     name: premisave-property-management-service
+
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/premisave-property}
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      repositories:
+        enabled: false
+
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
 
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 20MB
+      max-request-size: 50MB
+
 server:
   port: 8085
 
+# JWT Configuration
 jwt:
-  secret: ${JWT_SECRET:your-super-secret-jwt-key-at-least-32-bytes-long}
-  expiration: 86400000   # 24 hours in ms
+  secret: ${JWT_SECRET:eW91ci12ZXJ5LXNlY3VyZS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=}
+  expiration: 86400000
 
+# External Microservices
+auth-service:
+  url: ${AUTH_SERVICE_URL:http://localhost:8080}
+
+wallet-service:
+  url: ${WALLET_SERVICE_URL:http://localhost:8084}
+
+listing-service:
+  url: ${LISTING_SERVICE_URL:http://localhost:8082}
+
+booking-service:
+  url: ${BOOKING_SERVICE_URL:http://localhost:8083}
+
+# Internal API Key (must match Auth Service)
 app:
-  api-key: ${INTERNAL_API_KEY:dev-key-change-in-prod}
+  api-key: ${INTERNAL_API_KEY:00183e19c295366cf171c0d449d8b5ca46291573c9d1643e1e441b0bf571d1c7}
 
+# Frontend
 frontend:
   url: ${FRONTEND_URL:http://localhost:3000}
 
 logging:
   level:
     com.premisave.property: DEBUG
-    org.springframework.data.mongodb: INFO
+    org.springframework.cloud.openfeign: DEBUG
