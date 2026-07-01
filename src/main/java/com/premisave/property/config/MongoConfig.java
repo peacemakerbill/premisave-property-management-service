@@ -6,5 +6,7 @@ import org.springframework.data.mongodb.config.EnableMongoAuditing;
 @Configuration
 @EnableMongoAuditing
 public class MongoConfig {
-    // Additional MongoDB configuration can be added here if needed
+
+    // MongoDB specific configuration can be added here
+    // Auditing is enabled via @EnableMongoAuditing
 }
