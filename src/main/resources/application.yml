@@ -16,6 +16,9 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        default-requeue-rejected: false
 
   servlet:
     multipart:
@@ -29,7 +32,7 @@ server:
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:eW91ci12ZXJ5LXNlY3VyZS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=}
-  expiration: 86400000
+  expiration: 86400000   # 24 hours
 
 # External Microservices
 auth-service:
@@ -56,3 +59,5 @@ logging:
   level:
     com.premisave.property: DEBUG
     org.springframework.cloud.openfeign: DEBUG
+    org.springframework.data.mongodb: INFO
+    org.springframework.amqp: WARN
