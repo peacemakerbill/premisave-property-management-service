@@ -15,18 +15,16 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        // Call Auth Service to get user details
-        // For now, using a simple implementation. In production, use Feign client.
-
         try {
-            // Example: Fetch from Auth Service via Feign
+            // TODO: In production, call Auth Service via Feign
             // UserDto user = authServiceClient.getUserByEmail(email);
 
-            return UserPrincipal.builder()
-                    .email(email)
-                    .userId("user-id-from-auth")  // populated from Auth Service
-                    .role("HOME_OWNER")           // or CLIENT, ADMIN, etc.
-                    .build();
+            // Temporary implementation
+            return new UserPrincipal(
+                email,
+                "temp-user-id",           // Replace with real userId from Auth
+                "HOME_OWNER"              // Replace with actual role from Auth
+            );
 
         } catch (Exception e) {
             throw new UsernameNotFoundException("User not found with email: " + email, e);
