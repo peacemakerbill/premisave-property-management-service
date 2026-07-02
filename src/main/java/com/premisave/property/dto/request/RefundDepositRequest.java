@@ -7,11 +7,13 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 @Data
-public class SecurityDepositRequest {
+public class RefundDepositRequest {
 
     @NotBlank
     private String leaseId;
 
     @NotNull
     private BigDecimal amount;
+
+    private String reason;
 }

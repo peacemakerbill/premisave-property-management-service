@@ -4,6 +4,13 @@ import com.premisave.property.entity.SecurityDeposit;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
+
 @Repository
 public interface SecurityDepositRepository extends MongoRepository<SecurityDeposit, String> {
+
+    Optional<SecurityDeposit> findByLeaseId(String leaseId);
+
+    List<SecurityDeposit> findByTenantId(String tenantId);
 }

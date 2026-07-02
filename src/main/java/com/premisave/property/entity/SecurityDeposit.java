@@ -4,6 +4,8 @@ import lombok.Data;
 import org.springframework.data.annotation.*;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import com.premisave.property.enums.DepositStatus;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -22,7 +24,7 @@ public class SecurityDeposit {
 
     private LocalDateTime refundedAt;
 
-    private String status; // HELD, REFUNDED, DEDUCTED
+    private DepositStatus status; // HELD, REFUNDED, DEDUCTED
 
     @CreatedDate
     private LocalDateTime createdAt;
