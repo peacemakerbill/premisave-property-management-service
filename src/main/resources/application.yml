@@ -55,9 +55,10 @@ app:
 frontend:
   url: ${FRONTEND_URL:http://localhost:3000}
 
+# ── Logging ──
 logging:
   level:
-    com.premisave.property: DEBUG
-    org.springframework.cloud.openfeign: DEBUG
-    org.springframework.data.mongodb: INFO
-    org.springframework.amqp: WARN
+    "[com.premisave.property]": DEBUG
+    "[org.springframework.cloud.openfeign]": DEBUG
+    "[org.springframework.data.mongodb]": INFO
+    "[org.springframework.amqp]": WARN

@@ -1,0 +1,50 @@
+{
+  "properties": [
+    {
+      "name": "jwt.secret",
+      "type": "java.lang.String",
+      "description": "Base64-encoded secret key used to sign and verify JWTs. Must match the value used by auth-service."
+    },
+    {
+      "name": "jwt.expiration",
+      "type": "java.lang.Long",
+      "description": "JWT expiration time in milliseconds.",
+      "defaultValue": 86400000
+    },
+    {
+      "name": "auth-service.url",
+      "type": "java.lang.String",
+      "description": "Base URL of the auth-service, used by AuthServiceClient (Feign).",
+      "defaultValue": "http://localhost:8080"
+    },
+    {
+      "name": "wallet-service.url",
+      "type": "java.lang.String",
+      "description": "Base URL of the wallet-service, used for Feign client calls.",
+      "defaultValue": "http://localhost:8084"
+    },
+    {
+      "name": "listing-service.url",
+      "type": "java.lang.String",
+      "description": "Base URL of the listing-service, used for Feign client calls.",
+      "defaultValue": "http://localhost:8082"
+    },
+    {
+      "name": "booking-service.url",
+      "type": "java.lang.String",
+      "description": "Base URL of the booking-service, used for Feign client calls.",
+      "defaultValue": "http://localhost:8083"
+    },
+    {
+      "name": "app.api-key",
+      "type": "java.lang.String",
+      "description": "Internal API key used to authenticate service-to-service calls (X-API-Key header). Must match the value configured in auth-service."
+    },
+    {
+      "name": "frontend.url",
+      "type": "java.lang.String",
+      "description": "Base URL of the frontend application, used when building links (e.g. activation, reset-password) sent back to clients.",
+      "defaultValue": "http://localhost:3000"
+    }
+  ]
+}
