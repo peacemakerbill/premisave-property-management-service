@@ -1,23 +1,16 @@
-package com.premisave.property.dto.request;
+package com.premisave.property.dto.response;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
-public class InspectionRequest {
-
-    @NotBlank
+public class InspectionResponse {
+    private String id;
     private String rentalUnitId;
-
-    @NotBlank
+    private String inspectorId;
     private String title;
-
     private String findings;
     private String recommendations;
-
-    @NotNull
     private LocalDateTime inspectionDate;
 }
