@@ -38,6 +38,29 @@ public interface AuthServiceClient {
     UserDto getUserPublicProfile(@PathVariable String userId,
                                   @RequestHeader("Authorization") String authHeader);
 
+    /**
+     * Raw Feign binding — do not call directly, auth-service returns 400
+     * on blank/missing query. Use {@link #searchUsers(String, String)} instead.
+     */
+    @GetMapping("/profile/search")
+    List<UserDto> searchUsersRaw(@RequestParam("query") String query,
+                                  @RequestHeader("Authorization") String authHeader);
+
+    /**
+     * Search users by name, username, email, etc.
+     * Returns an empty list for null/blank query instead of letting
+     * auth-service's 400 surface as an unhandled FeignException.
+     */
+    default List<UserDto> searchUsers(String query, String authHeader) {
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+        return searchUsersRaw(query.trim(), authHeader);
+    }
+
+    @GetMapping("/profile/all")
+    List<UserDto> getAllUsers(@RequestHeader("Authorization") String authHeader);
+
     // ── Profile Views (user-JWT protected) ──────────────────────────
 
     @PostMapping("/profile/views/{targetId}")
