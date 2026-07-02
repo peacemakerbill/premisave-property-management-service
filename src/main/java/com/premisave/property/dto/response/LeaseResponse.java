@@ -11,6 +11,7 @@ public class LeaseResponse {
     private String id;
     private String tenantId;
     private String rentalUnitId;
+    private String propertyId;
     private LocalDate startDate;
     private LocalDate endDate;
     private BigDecimal monthlyRent;
