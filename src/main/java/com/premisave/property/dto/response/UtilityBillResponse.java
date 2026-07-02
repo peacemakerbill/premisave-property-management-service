@@ -1,33 +1,21 @@
-package com.premisave.property.entity;
+package com.premisave.property.dto.response;
 
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.UtilityType;
 import lombok.Data;
-import org.springframework.data.annotation.*;
-import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
-@Document(collection = "utility_bills")
-public class UtilityBill {
-
-    @Id
+public class UtilityBillResponse {
     private String id;
-
     private String tenantId;
     private String rentalUnitId;
-
     private UtilityType utilityType;
     private BigDecimal amount;
     private BigDecimal amountPaid;
-
+    private PaymentStatus status;
     private LocalDateTime billingPeriodStart;
     private LocalDateTime billingPeriodEnd;
-    
-    private PaymentStatus status = PaymentStatus.PENDING;
-
-    @CreatedDate
-    private LocalDateTime createdAt;
 }
