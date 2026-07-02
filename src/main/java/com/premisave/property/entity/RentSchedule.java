@@ -1,5 +1,6 @@
 package com.premisave.property.entity;
 
+import com.premisave.property.enums.PaymentStatus;
 import lombok.Data;
 import org.springframework.data.annotation.*;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -19,8 +20,9 @@ public class RentSchedule {
 
     private LocalDate dueDate;
     private BigDecimal amountDue;
+    private BigDecimal amountPaid = BigDecimal.ZERO;
 
-    private String status; // PENDING, PAID, OVERDUE
+    private PaymentStatus status = PaymentStatus.PENDING;
 
     @CreatedDate
     private LocalDateTime createdAt;

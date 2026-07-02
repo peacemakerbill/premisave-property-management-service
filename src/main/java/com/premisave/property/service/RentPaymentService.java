@@ -2,16 +2,17 @@ package com.premisave.property.service;
 
 import com.premisave.property.dto.request.RentPaymentRequest;
 import com.premisave.property.dto.response.RentPaymentResponse;
-import com.premisave.property.entity.Lease;
 import com.premisave.property.entity.RentPayment;
+import com.premisave.property.entity.RentSchedule;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.exception.ResourceNotFoundException;
-import com.premisave.property.repository.LeaseRepository;
 import com.premisave.property.repository.RentPaymentRepository;
+import com.premisave.property.repository.RentScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,22 +21,30 @@ import java.util.List;
 public class RentPaymentService {
 
     private final RentPaymentRepository rentPaymentRepository;
-    private final LeaseRepository leaseRepository;
+    private final RentScheduleRepository rentScheduleRepository;
 
     @Transactional
     public RentPaymentResponse recordPayment(RentPaymentRequest request, String tenantId) {
-        Lease lease = leaseRepository.findById(request.getLeaseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Lease not found"));
+        RentSchedule schedule = rentScheduleRepository
+                .findFirstByLeaseIdAndStatusInOrderByDueDateAsc(request.getLeaseId(),
+                        List.of(PaymentStatus.PENDING, PaymentStatus.PARTIALLY_PAID, PaymentStatus.OVERDUE))
+                .orElseThrow(() -> new ResourceNotFoundException("No outstanding rent due for this lease"));
 
-        RentPayment payment = new RentPayment();
-        payment.setLeaseId(lease.getId());
-        payment.setTenantId(tenantId);
-        payment.setAmount(lease.getMonthlyRent());
-        payment.setAmountPaid(request.getAmount());
-        payment.setPaidAt(LocalDateTime.now());
-        payment.setStatus(request.getAmount().compareTo(lease.getMonthlyRent()) >= 0
+        BigDecimal newAmountPaid = schedule.getAmountPaid().add(request.getAmount());
+        schedule.setAmountPaid(newAmountPaid);
+        schedule.setStatus(newAmountPaid.compareTo(schedule.getAmountDue()) >= 0
                 ? PaymentStatus.PAID
                 : PaymentStatus.PARTIALLY_PAID);
+        rentScheduleRepository.save(schedule);
+
+        RentPayment payment = new RentPayment();
+        payment.setLeaseId(request.getLeaseId());
+        payment.setTenantId(tenantId);
+        payment.setAmount(schedule.getAmountDue());
+        payment.setAmountPaid(request.getAmount());
+        payment.setStatus(schedule.getStatus());
+        payment.setDueDate(schedule.getDueDate().atStartOfDay());
+        payment.setPaidAt(LocalDateTime.now());
 
         RentPayment saved = rentPaymentRepository.save(payment);
 

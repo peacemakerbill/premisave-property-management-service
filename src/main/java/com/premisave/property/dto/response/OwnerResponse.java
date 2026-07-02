@@ -9,5 +9,7 @@ public class OwnerResponse {
     private String phoneNumber;
     private String email;
     private AddressResponse address;
+    private BankDetailsResponse bankDetails;
     private Boolean isActive;
+    private Boolean isVerified;
 }

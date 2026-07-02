@@ -1,16 +1,18 @@
 package com.premisave.property.repository;
 
 import com.premisave.property.entity.RentSchedule;
+import com.premisave.property.enums.PaymentStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
-@Repository
 public interface RentScheduleRepository extends MongoRepository<RentSchedule, String> {
 
     List<RentSchedule> findByLeaseId(String leaseId);
-    
-    List<RentSchedule> findByDueDateBetween(LocalDate start, LocalDate end);
+
+    Optional<RentSchedule> findFirstByLeaseIdAndStatusInOrderByDueDateAsc(String leaseId, List<PaymentStatus> statuses);
+
+    List<RentSchedule> findByDueDateBeforeAndStatusIn(LocalDate date, List<PaymentStatus> statuses);
 }

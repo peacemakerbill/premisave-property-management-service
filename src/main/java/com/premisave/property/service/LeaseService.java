@@ -24,6 +24,7 @@ public class LeaseService {
 
     private final LeaseRepository leaseRepository;
     private final RentalUnitRepository rentalUnitRepository;
+    private final RentScheduleService rentScheduleService;
 
     @Transactional
     public LeaseResponse createLease(CreateLeaseRequest request) {
@@ -52,6 +53,8 @@ public class LeaseService {
 
         unit.setStatus(UnitStatus.OCCUPIED);
         rentalUnitRepository.save(unit);
+
+        rentScheduleService.generateMonthlySchedule(saved.getId());
 
         return toResponse(saved);
     }

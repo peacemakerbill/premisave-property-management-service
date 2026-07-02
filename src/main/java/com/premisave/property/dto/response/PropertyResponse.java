@@ -13,6 +13,11 @@ public class PropertyResponse {
     private String description;
     private PropertyType propertyType;
     private AddressResponse address;
+    private Double latitude;
+    private Double longitude;
+    private Integer totalUnits;
+    private Integer availableUnits;
     private Boolean isActive;
+    private Boolean isVerified;
     private LocalDateTime createdAt;
 }

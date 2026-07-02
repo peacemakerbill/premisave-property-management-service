@@ -1,6 +1,7 @@
 package com.premisave.property.controller;
 
 import com.premisave.property.dto.request.CreatePropertyRequest;
+import com.premisave.property.dto.request.UpdatePropertyRequest;
 import com.premisave.property.dto.response.PropertyResponse;
 import com.premisave.property.service.PropertyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,5 +34,18 @@ public class PropertyController {
     public ResponseEntity<List<PropertyResponse>> getMyProperties() {
         List<PropertyResponse> properties = propertyService.getOwnerProperties("current-owner-id");
         return ResponseEntity.ok(properties);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<PropertyResponse> getProperty(@PathVariable String id) {
+        return ResponseEntity.ok(propertyService.getPropertyById(id));
+    }
+
+    @PatchMapping("/{id}")
+    @PreAuthorize("hasRole('HOME_OWNER')")
+    public ResponseEntity<PropertyResponse> updateProperty(@PathVariable String id,
+                                                             @RequestBody UpdatePropertyRequest request) {
+        // ownerId from SecurityContext
+        return ResponseEntity.ok(propertyService.updateProperty(id, request, "current-owner-id"));
     }
 }
