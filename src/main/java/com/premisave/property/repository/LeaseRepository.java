@@ -13,4 +13,6 @@ public interface LeaseRepository extends MongoRepository<Lease, String> {
     List<Lease> findByRentalUnitId(String rentalUnitId);
 
     List<Lease> findByStatus(LeaseStatus status);
+    
+    long countByPropertyIdInAndStatus(List<String> propertyIds, LeaseStatus status);
 }

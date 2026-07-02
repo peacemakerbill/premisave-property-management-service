@@ -15,4 +15,6 @@ public interface MaintenanceRequestRepository extends MongoRepository<Maintenanc
     List<Maintenance> findByRentalUnitId(String rentalUnitId);
 
     List<Maintenance> findByStatus(MaintenanceStatus status);
+    
+    List<Maintenance> findByRentalUnitIdInAndStatusIn(List<String> rentalUnitIds, List<MaintenanceStatus> statuses);
 }

@@ -7,7 +7,9 @@ import java.math.BigDecimal;
 @Data
 public class DashboardSummaryResponse {
     private long totalProperties;
+    private long totalUnits;
     private long occupiedUnits;
+    private long activeLeases;
     private BigDecimal monthlyRevenue;
-    private int pendingMaintenance;
+    private long pendingMaintenance;
 }
