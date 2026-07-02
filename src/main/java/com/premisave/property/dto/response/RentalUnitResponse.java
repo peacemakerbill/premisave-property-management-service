@@ -11,4 +11,5 @@ public class RentalUnitResponse {
     private String unitNumber;
     private BigDecimal rentAmount;
     private UnitStatus status;
+    private Boolean depositRequired;
 }

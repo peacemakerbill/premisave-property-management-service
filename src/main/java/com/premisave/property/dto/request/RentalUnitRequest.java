@@ -15,4 +15,5 @@ public class RentalUnitRequest {
     private BigDecimal rentAmount;
 
     private BigDecimal securityDeposit;
+    private Boolean depositRequired;
 }

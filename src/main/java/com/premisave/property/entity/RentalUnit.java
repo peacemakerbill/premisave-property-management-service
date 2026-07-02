@@ -21,6 +21,8 @@ public class RentalUnit {
 
     private BigDecimal rentAmount;
     private BigDecimal securityDeposit;
+    
+    private Boolean depositRequired = true;
 
     private UnitStatus status = UnitStatus.VACANT;
 
