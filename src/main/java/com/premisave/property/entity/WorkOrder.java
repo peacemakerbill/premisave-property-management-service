@@ -4,6 +4,8 @@ import lombok.Data;
 import org.springframework.data.annotation.*;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import com.premisave.property.enums.WorkOrderStatus;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -18,7 +20,7 @@ public class WorkOrder {
 
     private String title;
     private String description;
-    private String status;               // ASSIGNED, IN_PROGRESS, COMPLETED
+    private WorkOrderStatus  status;               // ASSIGNED, IN_PROGRESS, COMPLETED
 
     private LocalDateTime completedAt;
 
