@@ -14,6 +14,5 @@ public interface RentalUnitRepository extends MongoRepository<RentalUnit, String
     
     List<RentalUnit> findByStatus(UnitStatus status);
     
-    // Fixed: Added this method
     long countByStatus(UnitStatus status);
 }
