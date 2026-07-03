@@ -1,5 +1,7 @@
 package com.premisave.property.service;
 
+import com.premisave.property.client.WalletServiceClient;
+import com.premisave.property.dto.request.RecordRentPaymentRequest;
 import com.premisave.property.dto.request.RentPaymentRequest;
 import com.premisave.property.dto.request.SecurityDepositRequest;
 import com.premisave.property.dto.response.PaymentDueResponse;
@@ -18,6 +20,7 @@ import com.premisave.property.repository.RentScheduleRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.SecurityDepositRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RentPaymentService {
@@ -35,21 +39,20 @@ public class RentPaymentService {
     private final RentalUnitRepository rentalUnitRepository;
     private final SecurityDepositRepository securityDepositRepository;
     private final SecurityDepositService securityDepositService;
+    private final WalletServiceClient walletServiceClient;
 
     // ------------------------------------------------------------------
     // TODO(WALLET-INTEGRATION):
-    // This service currently assumes money has ALREADY been collected by the
-    // time recordPayment() is called — it only books the transaction against
-    // rent schedules / deposits. Once the wallet service is connected:
-    //   1. Tenant hits POST /api/v1/rent/pay (or a new /initiate endpoint)
-    //   2. This service (or a new PaymentGatewayService) calls the wallet
-    //      service, which triggers M-Pesa STK Push / Stripe / PayPal
-    //      depending on RentPaymentRequest.paymentMethod
-    //   3. Wallet service confirms success asynchronously (webhook/callback
-    //      or RabbitMQ event — matches the existing RentPaidEvent TODO below)
-    //   4. Only on confirmed success should recordPayment() actually run
-    // Until then, recordPayment() is effectively a manual/confirmed-payment
-    // booking endpoint, not a live checkout.
+    // This service still assumes money has ALREADY been collected by the
+    // time recordPayment() is called — it books the transaction against rent
+    // schedules / deposits, then records it in Wallet Service for the
+    // tenant's statement history. It does NOT yet trigger a live checkout
+    // (M-Pesa STK Push / Stripe / PayPal) — that would mean a separate
+    // /initiate endpoint that calls wallet-service BEFORE recordPayment()
+    // runs, with recordPayment() only firing after a payment provider
+    // confirms success (webhook/callback or RabbitMQ event). Until then,
+    // this is a manual/confirmed-payment booking endpoint, not a live
+    // checkout flow.
     // ------------------------------------------------------------------
 
     public PaymentDueResponse getPaymentDue(String leaseId) {
@@ -144,7 +147,11 @@ public class RentPaymentService {
 
         RentPayment saved = rentPaymentRepository.save(payment);
 
-        // TODO: publish RentPaidEvent to RabbitMQ for Wallet Service, etc.
+        // Record the payment in Wallet Service for the tenant's transaction
+        // history. Deliberately NOT part of the DB transaction above — a
+        // wallet-service hiccup must never roll back or fail a rent payment
+        // that has already been booked against the lease's rent schedule.
+        recordInWallet(saved, lease.getPropertyId());
 
         return toResponse(saved);
     }
@@ -153,6 +160,32 @@ public class RentPaymentService {
         return rentPaymentRepository.findByLeaseId(leaseId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * Best-effort call to Wallet Service. Failures are logged, not thrown —
+     * the RentPayment row saved above is the source of truth for the payment.
+     * TODO: once Wallet Service exposes a reconciliation/replay endpoint,
+     * failed attempts here should be queued for retry instead of only logged.
+     */
+    private void recordInWallet(RentPayment payment, String propertyId) {
+        try {
+            RecordRentPaymentRequest walletRequest = RecordRentPaymentRequest.builder()
+                    .tenantId(payment.getTenantId())
+                    .leaseId(payment.getLeaseId())
+                    .propertyId(propertyId)
+                    .amount(payment.getAmountPaid())
+                    .paymentReference(payment.getId())
+                    .paymentMethod(payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : null)
+                    .paidAt(payment.getPaidAt())
+                    .description("Rent payment for lease " + payment.getLeaseId())
+                    .build();
+
+            walletServiceClient.recordRentPayment(walletRequest);
+        } catch (Exception e) {
+            log.error("Failed to record rent payment {} in wallet-service (tenantId={}, leaseId={}): {}",
+                    payment.getId(), payment.getTenantId(), payment.getLeaseId(), e.getMessage());
+        }
     }
 
     private PaymentType resolvePaymentType(BigDecimal depositApplied, BigDecimal rentApplied) {
