@@ -1,6 +1,7 @@
 package com.premisave.property.service;
 
 import com.premisave.property.dto.response.DashboardSummaryResponse;
+import com.premisave.property.entity.Lease;
 import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentPayment;
 import com.premisave.property.entity.RentalUnit;
@@ -77,12 +78,20 @@ public class DashboardService {
             return BigDecimal.ZERO;
         }
 
+        List<String> leaseIds = leaseRepository.findByPropertyIdIn(propertyIds).stream()
+                .map(Lease::getId)
+                .toList();
+
+        if (leaseIds.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
         YearMonth currentMonth = YearMonth.now();
         LocalDateTime start = currentMonth.atDay(1).atStartOfDay();
         LocalDateTime end = currentMonth.plusMonths(1).atDay(1).atStartOfDay();
 
         List<RentPayment> payments = rentPaymentRepository
-                .findByPropertyIdInAndPaidAtBetween(propertyIds, start, end);
+                .findByLeaseIdInAndPaidAtBetween(leaseIds, start, end);
 
         return payments.stream()
                 .filter(p -> p.getStatus() == PaymentStatus.PAID || p.getStatus() == PaymentStatus.PARTIALLY_PAID)

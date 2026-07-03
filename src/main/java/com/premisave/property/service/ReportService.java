@@ -2,11 +2,13 @@ package com.premisave.property.service;
 
 import com.premisave.property.dto.response.OccupancyReportResponse;
 import com.premisave.property.dto.response.RevenueReportResponse;
+import com.premisave.property.entity.Lease;
 import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentPayment;
 import com.premisave.property.entity.RentalUnit;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.UnitStatus;
+import com.premisave.property.repository.LeaseRepository;
 import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentPaymentRepository;
 import com.premisave.property.repository.RentalUnitRepository;
@@ -24,6 +26,7 @@ public class ReportService {
 
     private final PropertyRepository propertyRepository;
     private final RentalUnitRepository rentalUnitRepository;
+    private final LeaseRepository leaseRepository;
     private final RentPaymentRepository rentPaymentRepository;
 
     public OccupancyReportResponse getOccupancyReport(String ownerId) {
@@ -50,9 +53,15 @@ public class ReportService {
                 .map(Property::getId)
                 .toList();
 
-        List<RentPayment> payments = propertyIds.isEmpty()
+        List<String> leaseIds = propertyIds.isEmpty()
                 ? List.of()
-                : rentPaymentRepository.findByPropertyIdInAndPaidAtBetween(propertyIds, startDateTime, endDateTime);
+                : leaseRepository.findByPropertyIdIn(propertyIds).stream()
+                        .map(Lease::getId)
+                        .toList();
+
+        List<RentPayment> payments = leaseIds.isEmpty()
+                ? List.of()
+                : rentPaymentRepository.findByLeaseIdInAndPaidAtBetween(leaseIds, startDateTime, endDateTime);
 
         BigDecimal totalRevenue = payments.stream()
                 .filter(p -> p.getStatus() == PaymentStatus.PAID || p.getStatus() == PaymentStatus.PARTIALLY_PAID)
