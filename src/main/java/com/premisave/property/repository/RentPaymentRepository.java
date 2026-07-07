@@ -12,6 +12,6 @@ public interface RentPaymentRepository extends MongoRepository<RentPayment, Stri
 
     List<RentPayment> findByTenantId(String tenantId);
 
-    List<RentPayment> findByPropertyIdInAndPaidAtBetween(
-            List<String> propertyIds, LocalDateTime start, LocalDateTime end);
+    List<RentPayment> findByLeaseIdInAndPaidAtBetween(
+            List<String> leaseIds, LocalDateTime start, LocalDateTime end);
 }

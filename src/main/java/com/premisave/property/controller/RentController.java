@@ -4,6 +4,7 @@ import com.premisave.property.dto.request.RentPaymentRequest;
 import com.premisave.property.dto.response.PaymentDueResponse;
 import com.premisave.property.dto.response.RentPaymentResponse;
 import com.premisave.property.service.RentPaymentService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,15 +24,11 @@ public class RentController {
         return ResponseEntity.ok(rentPaymentService.getPaymentDue(leaseId));
     }
 
-    // TODO(WALLET-INTEGRATION): this currently books a payment as already
-    // collected. Once the wallet service is connected, this endpoint (or a
-    // new /initiate endpoint) should trigger the wallet service instead,
-    // which handles M-Pesa STK Push / Stripe / PayPal, and only call
-    // recordPayment() after the wallet confirms success.
     @PostMapping("/pay")
-    public ResponseEntity<RentPaymentResponse> payRent(@Valid @RequestBody RentPaymentRequest request) {
-        // tenantId from SecurityContext
-        RentPaymentResponse response = rentPaymentService.recordPayment(request, "tenant-id-from-jwt");
+    public ResponseEntity<RentPaymentResponse> payRent(@Valid @RequestBody RentPaymentRequest request,
+                                                         HttpServletRequest httpRequest) {
+        String tenantId = (String) httpRequest.getAttribute("userId");
+        RentPaymentResponse response = rentPaymentService.recordPayment(request, tenantId);
         return ResponseEntity.ok(response);
     }
 
