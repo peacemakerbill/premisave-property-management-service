@@ -4,6 +4,7 @@ import com.premisave.property.dto.request.CreateOwnerRequest;
 import com.premisave.property.dto.request.UpdateOwnerRequest;
 import com.premisave.property.dto.response.OwnerResponse;
 import com.premisave.property.service.OwnerService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,16 +18,17 @@ public class OwnerController {
     private final OwnerService ownerService;
 
     @PostMapping
-    public ResponseEntity<OwnerResponse> createOwner(@Valid @RequestBody CreateOwnerRequest request) {
-        // userId from SecurityContext
-        OwnerResponse owner = ownerService.createOwner(request, "user-id-from-jwt");
+    public ResponseEntity<OwnerResponse> createOwner(@Valid @RequestBody CreateOwnerRequest request,
+                                                       HttpServletRequest httpRequest) {
+        String userId = resolveUserId(httpRequest);
+        OwnerResponse owner = ownerService.createOwner(request, userId);
         return ResponseEntity.ok(owner);
     }
 
     @GetMapping("/me")
-    public ResponseEntity<OwnerResponse> getMyOwnerProfile() {
-        // userId from SecurityContext
-        return ResponseEntity.ok(ownerService.getOwnerByUserId("user-id-from-jwt"));
+    public ResponseEntity<OwnerResponse> getMyOwnerProfile(HttpServletRequest httpRequest) {
+        String userId = resolveUserId(httpRequest);
+        return ResponseEntity.ok(ownerService.getOwnerByUserId(userId));
     }
 
     @GetMapping("/{id}")
@@ -36,8 +38,13 @@ public class OwnerController {
 
     @PatchMapping("/{id}")
     public ResponseEntity<OwnerResponse> updateOwner(@PathVariable String id,
-                                                       @RequestBody UpdateOwnerRequest request) {
-        // userId from SecurityContext
-        return ResponseEntity.ok(ownerService.updateOwner(id, request, "user-id-from-jwt"));
+                                                       @RequestBody UpdateOwnerRequest request,
+                                                       HttpServletRequest httpRequest) {
+        String userId = resolveUserId(httpRequest);
+        return ResponseEntity.ok(ownerService.updateOwner(id, request, userId));
+    }
+
+    private String resolveUserId(HttpServletRequest httpRequest) {
+        return (String) httpRequest.getAttribute("userId");
     }
 }
