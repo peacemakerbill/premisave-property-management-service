@@ -2,6 +2,7 @@ package com.premisave.property.service;
 
 import com.premisave.property.dto.request.TenantRegistrationRequest;
 import com.premisave.property.dto.request.UpdateTenantRequest;
+import com.premisave.property.dto.response.AddressResponse;
 import com.premisave.property.dto.response.TenantResponse;
 import com.premisave.property.entity.Address;
 import com.premisave.property.entity.Tenant;
@@ -9,6 +10,7 @@ import com.premisave.property.exception.BadRequestException;
 import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.TenantRepository;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,13 +22,17 @@ public class TenantService {
     private final TenantRepository tenantRepository;
 
     @Transactional
-    public TenantResponse registerTenant(TenantRegistrationRequest request) {
+    public TenantResponse registerTenant(TenantRegistrationRequest request, String userId) {
         if (request.getFullName() == null || request.getFullName().isBlank()) {
             throw new BadRequestException("fullName is required");
         }
         if (request.getPhoneNumber() == null || request.getPhoneNumber().isBlank()) {
             throw new BadRequestException("phoneNumber is required");
         }
+
+        tenantRepository.findByUserId(userId).ifPresent(existing -> {
+            throw new ConflictException("A tenant profile already exists for this user");
+        });
 
         if (request.getIdNumber() != null) {
             tenantRepository.findByIdNumber(request.getIdNumber()).ifPresent(existing -> {
@@ -38,6 +44,7 @@ public class TenantService {
         });
 
         Tenant tenant = new Tenant();
+        tenant.setUserId(userId);
         tenant.setFullName(request.getFullName());
         tenant.setPhoneNumber(request.getPhoneNumber());
         tenant.setEmail(request.getEmail());
@@ -54,14 +61,12 @@ public class TenantService {
     }
 
     public TenantResponse getTenantByUserId(String userId) {
-        return tenantRepository.findByUserId(userId)
-                .map(this::toResponse)
-                .orElseThrow(() -> new ResourceNotFoundException("Tenant profile not found"));
+        return toResponse(findTenantByUserIdOrThrow(userId));
     }
 
     @Transactional
-    public TenantResponse updateTenant(String id, UpdateTenantRequest request) {
-        Tenant tenant = findTenantOrThrow(id);
+    public TenantResponse updateTenantByUserId(UpdateTenantRequest request, String userId) {
+        Tenant tenant = findTenantByUserIdOrThrow(userId);
 
         if (request.getFullName() != null) {
             tenant.setFullName(request.getFullName());
@@ -92,6 +97,11 @@ public class TenantService {
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
     }
 
+    private Tenant findTenantByUserIdOrThrow(String userId) {
+        return tenantRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant profile not found"));
+    }
+
     private Address toAddress(com.premisave.property.dto.request.AddressRequest request) {
         if (request == null) {
             return null;
@@ -105,14 +115,34 @@ public class TenantService {
         return address;
     }
 
+    private AddressResponse toAddressResponse(Address address) {
+        if (address == null) {
+            return null;
+        }
+        AddressResponse response = new AddressResponse();
+        response.setStreet(address.getStreet());
+        response.setCity(address.getCity());
+        response.setState(address.getState());
+        response.setCountry(address.getCountry());
+        response.setPostalCode(address.getPostalCode());
+        response.setLandmark(address.getLandmark());
+        return response;
+    }
+
     private TenantResponse toResponse(Tenant tenant) {
         TenantResponse response = new TenantResponse();
         response.setId(tenant.getId());
+        response.setUserId(tenant.getUserId());
         response.setFullName(tenant.getFullName());
         response.setPhoneNumber(tenant.getPhoneNumber());
         response.setEmail(tenant.getEmail());
         response.setIdNumber(tenant.getIdNumber());
+        response.setOccupation(tenant.getOccupation());
+        response.setCurrentAddress(toAddressResponse(tenant.getCurrentAddress()));
+        response.setIsActive(tenant.getIsActive());
         response.setIsBlacklisted(tenant.getIsBlacklisted());
+        response.setCreatedAt(tenant.getCreatedAt());
+        response.setUpdatedAt(tenant.getUpdatedAt());
         return response;
     }
 }
