@@ -9,9 +9,12 @@ import com.premisave.property.entity.Address;
 import com.premisave.property.entity.GeoLocation;
 import com.premisave.property.entity.Property;
 import com.premisave.property.exception.BadRequestException;
+import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.exception.UnauthorizedException;
 import com.premisave.property.repository.PropertyRepository;
+import com.premisave.property.repository.RentalUnitRepository;
+import com.premisave.property.enums.UnitStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +26,7 @@ import java.util.List;
 public class PropertyService {
 
     private final PropertyRepository propertyRepository;
+    private final RentalUnitRepository rentalUnitRepository;
 
     @Transactional
     public PropertyResponse createProperty(CreatePropertyRequest request, String ownerId) {
@@ -80,6 +84,25 @@ public class PropertyService {
         }
 
         return toResponse(propertyRepository.save(property));
+    }
+
+    @Transactional
+    public void deleteProperty(String id, String ownerId) {
+        Property property = findPropertyOrThrow(id);
+
+        if (!property.getOwnerId().equals(ownerId)) {
+            throw new UnauthorizedException("You do not have access to this property");
+        }
+
+        boolean hasOccupiedUnits = rentalUnitRepository.findByPropertyId(id).stream()
+                .anyMatch(unit -> unit.getStatus() == UnitStatus.OCCUPIED);
+
+        if (hasOccupiedUnits) {
+            throw new ConflictException(
+                    "This property has occupied units and cannot be deleted. Terminate active leases first.");
+        }
+
+        propertyRepository.delete(property);
     }
 
     private Property findPropertyOrThrow(String id) {

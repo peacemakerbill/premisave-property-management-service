@@ -55,6 +55,15 @@ public class PropertyController {
         return ResponseEntity.ok(propertyService.updateProperty(id, request, ownerId));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('HOME_OWNER')")
+    @Operation(summary = "Delete a property")
+    public ResponseEntity<Void> deleteProperty(@PathVariable String id, HttpServletRequest httpRequest) {
+        String ownerId = resolveOwnerId(httpRequest);
+        propertyService.deleteProperty(id, ownerId);
+        return ResponseEntity.noContent().build();
+    }
+
     private String resolveOwnerId(HttpServletRequest httpRequest) {
         String userId = (String) httpRequest.getAttribute("userId");
         return ownerService.getOwnerByUserId(userId).getId();
