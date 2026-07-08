@@ -116,6 +116,26 @@ public class LeaseService {
                 .toList();
     }
 
+    public List<LeaseResponse> getLeasesForOwner(String ownerId) {
+        List<String> propertyIds = propertyRepository.findByOwnerId(ownerId).stream()
+                .map(Property::getId)
+                .toList();
+
+        if (propertyIds.isEmpty()) {
+            return List.of();
+        }
+
+        return leaseRepository.findByPropertyIdIn(propertyIds).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<LeaseResponse> getAllLeases() {
+        return leaseRepository.findAll().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional
     public LeaseResponse updateLease(String id, UpdateLeaseRequest request) {
         Lease lease = findLeaseOrThrow(id);
