@@ -57,10 +57,20 @@ public class RentPaymentService {
 
     public PaymentDueResponse getPaymentDue(String leaseId) {
         Lease lease = findLeaseOrThrow(leaseId);
-        RentalUnit unit = findUnitOrThrow(lease.getRentalUnitId());
 
-        boolean depositRequired = Boolean.TRUE.equals(unit.getDepositRequired());
+        boolean depositRequired;
         boolean depositHeld = securityDepositRepository.findByLeaseId(leaseId).isPresent();
+        BigDecimal depositAmount;
+
+        if (lease.getRentalUnitId() != null) {
+            RentalUnit unit = findUnitOrThrow(lease.getRentalUnitId());
+            depositRequired = Boolean.TRUE.equals(unit.getDepositRequired());
+            depositAmount = unit.getSecurityDeposit();
+        } else {
+            // Whole-property lease — deposit terms live directly on the Lease
+            depositAmount = lease.getSecurityDeposit();
+            depositRequired = depositAmount != null && depositAmount.compareTo(BigDecimal.ZERO) > 0;
+        }
 
         BigDecimal rentDue = rentScheduleRepository
                 .findFirstByLeaseIdAndStatusInOrderByDueDateAsc(leaseId,
@@ -68,8 +78,8 @@ public class RentPaymentService {
                 .map(s -> s.getAmountDue().subtract(s.getAmountPaid()))
                 .orElse(BigDecimal.ZERO);
 
-        BigDecimal depositDue = (depositRequired && !depositHeld && unit.getSecurityDeposit() != null)
-                ? unit.getSecurityDeposit()
+        BigDecimal depositDue = (depositRequired && !depositHeld && depositAmount != null)
+                ? depositAmount
                 : BigDecimal.ZERO;
 
         PaymentDueResponse response = new PaymentDueResponse();
@@ -85,32 +95,41 @@ public class RentPaymentService {
     @Transactional
     public RentPaymentResponse recordPayment(RentPaymentRequest request, String tenantId) {
         Lease lease = findLeaseOrThrow(request.getLeaseId());
-        RentalUnit unit = findUnitOrThrow(lease.getRentalUnitId());
+
+        boolean depositRequired;
+        BigDecimal depositAmount;
+
+        if (lease.getRentalUnitId() != null) {
+            RentalUnit unit = findUnitOrThrow(lease.getRentalUnitId());
+            depositRequired = Boolean.TRUE.equals(unit.getDepositRequired());
+            depositAmount = unit.getSecurityDeposit();
+        } else {
+            depositAmount = lease.getSecurityDeposit();
+            depositRequired = depositAmount != null && depositAmount.compareTo(BigDecimal.ZERO) > 0;
+        }
 
         BigDecimal remaining = request.getAmount();
         BigDecimal depositApplied = BigDecimal.ZERO;
 
-        boolean depositRequired = Boolean.TRUE.equals(unit.getDepositRequired());
         boolean depositAlreadyHeld = securityDepositRepository.findByLeaseId(lease.getId()).isPresent();
 
         if (depositRequired && !depositAlreadyHeld
-                && unit.getSecurityDeposit() != null
-                && unit.getSecurityDeposit().compareTo(BigDecimal.ZERO) > 0) {
+                && depositAmount != null
+                && depositAmount.compareTo(BigDecimal.ZERO) > 0) {
 
-            BigDecimal depositDue = unit.getSecurityDeposit();
-            if (remaining.compareTo(depositDue) < 0) {
+            if (remaining.compareTo(depositAmount) < 0) {
                 throw new BadRequestException(
                         "Payment of " + remaining + " is less than the required security deposit of "
-                                + depositDue + ". Deposit must be settled before or alongside rent.");
+                                + depositAmount + ". Deposit must be settled before or alongside rent.");
             }
 
             SecurityDepositRequest depositRequest = new SecurityDepositRequest();
             depositRequest.setLeaseId(lease.getId());
-            depositRequest.setAmount(depositDue);
+            depositRequest.setAmount(depositAmount);
             securityDepositService.holdDeposit(depositRequest);
 
-            depositApplied = depositDue;
-            remaining = remaining.subtract(depositDue);
+            depositApplied = depositAmount;
+            remaining = remaining.subtract(depositAmount);
         }
 
         BigDecimal rentApplied = BigDecimal.ZERO;

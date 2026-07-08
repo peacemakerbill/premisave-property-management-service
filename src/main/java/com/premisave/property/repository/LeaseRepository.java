@@ -2,6 +2,7 @@ package com.premisave.property.repository;
 
 import com.premisave.property.entity.Lease;
 import com.premisave.property.enums.LeaseStatus;
+import com.premisave.property.enums.LeaseType;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
@@ -19,4 +20,6 @@ public interface LeaseRepository extends MongoRepository<Lease, String> {
     long countByPropertyIdInAndStatus(List<String> propertyIds, LeaseStatus status);
 
     boolean existsByRentalUnitIdAndStatus(String rentalUnitId, LeaseStatus status);
+
+    boolean existsByPropertyIdAndLeaseTypeAndStatus(String propertyId, LeaseType leaseType, LeaseStatus status);
 }

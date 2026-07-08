@@ -1,6 +1,7 @@
 package com.premisave.property.entity;
 
 import com.premisave.property.enums.LeaseStatus;
+import com.premisave.property.enums.LeaseType;
 import lombok.Data;
 import org.springframework.data.annotation.*;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -17,8 +18,10 @@ public class Lease {
     private String id;
 
     private String tenantId;
-    private String rentalUnitId;
+    private String rentalUnitId;   // null for WHOLE_PROPERTY leases
     private String propertyId;
+
+    private LeaseType leaseType = LeaseType.UNIT;
 
     private LocalDate startDate;
     private LocalDate endDate;
