@@ -8,8 +8,11 @@ import java.math.BigDecimal;
 @Data
 public class RentalUnitResponse {
     private String id;
+    private String propertyId;
     private String unitNumber;
+    private String floor;
     private BigDecimal rentAmount;
-    private UnitStatus status;
+    private BigDecimal securityDeposit;
     private Boolean depositRequired;
+    private UnitStatus status;
 }

@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/properties")
@@ -58,10 +59,10 @@ public class PropertyController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('HOME_OWNER')")
     @Operation(summary = "Delete a property")
-    public ResponseEntity<Void> deleteProperty(@PathVariable String id, HttpServletRequest httpRequest) {
+    public ResponseEntity<Map<String, String>> deleteProperty(@PathVariable String id, HttpServletRequest httpRequest) {
         String ownerId = resolveOwnerId(httpRequest);
         propertyService.deleteProperty(id, ownerId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(Map.of("message", "Property has been deleted successfully"));
     }
 
     private String resolveOwnerId(HttpServletRequest httpRequest) {

@@ -1,5 +1,6 @@
 package com.premisave.property.dto.request;
 
+import com.premisave.property.enums.UnitStatus;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -16,4 +17,5 @@ public class RentalUnitRequest {
 
     private BigDecimal securityDeposit;
     private Boolean depositRequired;
+    private UnitStatus status;
 }

@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/units")
@@ -37,5 +38,11 @@ public class RentalUnitController {
     public ResponseEntity<RentalUnitResponse> updateUnit(@PathVariable String id,
                                                            @RequestBody RentalUnitRequest request) {
         return ResponseEntity.ok(rentalUnitService.updateUnit(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, String>> deleteUnit(@PathVariable String id) {
+        rentalUnitService.deleteUnit(id);
+        return ResponseEntity.ok(Map.of("message", "Rental unit has been deleted successfully"));
     }
 }
