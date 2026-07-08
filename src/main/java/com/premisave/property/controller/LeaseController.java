@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/leases")
@@ -40,7 +41,11 @@ public class LeaseController {
     }
 
     @PostMapping("/{id}/terminate")
-    public ResponseEntity<LeaseResponse> terminateLease(@PathVariable String id) {
-        return ResponseEntity.ok(leaseService.terminateLease(id));
+    public ResponseEntity<Map<String, Object>> terminateLease(@PathVariable String id) {
+        LeaseResponse response = leaseService.terminateLease(id);
+        return ResponseEntity.ok(Map.of(
+                "message", "Lease has been terminated successfully",
+                "lease", response
+        ));
     }
 }

@@ -137,6 +137,11 @@ public class LeaseService {
     @Transactional
     public LeaseResponse terminateLease(String id) {
         Lease lease = findLeaseOrThrow(id);
+
+        if (lease.getStatus() == LeaseStatus.TERMINATED) {
+            throw new ConflictException("This lease has already been terminated");
+        }
+
         lease.setStatus(LeaseStatus.TERMINATED);
         Lease saved = leaseRepository.save(lease);
         releaseUnitIfApplicable(lease);
