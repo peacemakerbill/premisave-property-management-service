@@ -1,6 +1,7 @@
 package com.premisave.property.dto.response;
 
 import com.premisave.property.enums.PropertyType;
+import com.premisave.property.enums.RegistrationType;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -13,6 +14,8 @@ public class PropertyResponse {
     private String description;
     private PropertyType propertyType;
     private AddressResponse address;
+    private String registrationNumber;
+    private RegistrationType registrationType;
     private Double latitude;
     private Double longitude;
     private Integer totalUnits;

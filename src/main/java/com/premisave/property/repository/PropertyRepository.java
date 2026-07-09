@@ -13,4 +13,6 @@ public interface PropertyRepository extends MongoRepository<Property, String> {
     List<Property> findByOwnerId(String ownerId);
     List<Property> findByIsActiveTrue();
     Optional<Property> findByIdAndOwnerId(String id, String ownerId);
+    Optional<Property> findByRegistrationNumber(String registrationNumber);
+    boolean existsByRegistrationNumber(String registrationNumber);
 }

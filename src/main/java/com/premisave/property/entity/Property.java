@@ -1,8 +1,10 @@
 package com.premisave.property.entity;
 
 import com.premisave.property.enums.PropertyType;
+import com.premisave.property.enums.RegistrationType;
 import lombok.Data;
 import org.springframework.data.annotation.*;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -21,6 +23,10 @@ public class Property {
     private PropertyType propertyType;
     private Address address;
     private GeoLocation location;
+
+    @Indexed(unique = true)
+    private String registrationNumber;         // Title deed / LR number / lease certificate no.
+    private RegistrationType registrationType;
 
     private Integer totalUnits;
     private Integer availableUnits;

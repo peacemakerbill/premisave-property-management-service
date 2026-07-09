@@ -22,4 +22,6 @@ public interface LeaseRepository extends MongoRepository<Lease, String> {
     boolean existsByRentalUnitIdAndStatus(String rentalUnitId, LeaseStatus status);
 
     boolean existsByPropertyIdAndLeaseTypeAndStatus(String propertyId, LeaseType leaseType, LeaseStatus status);
+
+    boolean existsByPropertyIdAndStatus(String propertyId, LeaseStatus status);
 }
