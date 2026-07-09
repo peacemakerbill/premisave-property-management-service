@@ -2,7 +2,11 @@ package com.premisave.property.service;
 
 import com.premisave.property.dto.request.CreateLeaseRequest;
 import com.premisave.property.dto.request.UpdateLeaseRequest;
+import com.premisave.property.dto.response.AddressResponse;
 import com.premisave.property.dto.response.LeaseResponse;
+import com.premisave.property.dto.response.PropertySummaryResponse;
+import com.premisave.property.dto.response.RentalUnitSummaryResponse;
+import com.premisave.property.entity.Address;
 import com.premisave.property.entity.Lease;
 import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentalUnit;
@@ -195,6 +199,51 @@ public class LeaseService {
         response.setMonthlyRent(lease.getMonthlyRent());
         response.setSecurityDeposit(lease.getSecurityDeposit());
         response.setStatus(lease.getStatus());
+
+        if (lease.getPropertyId() != null) {
+            propertyRepository.findById(lease.getPropertyId())
+                    .ifPresent(property -> response.setProperty(toPropertySummary(property)));
+        }
+
+        if (lease.getRentalUnitId() != null) {
+            rentalUnitRepository.findById(lease.getRentalUnitId())
+                    .ifPresent(unit -> response.setRentalUnit(toRentalUnitSummary(unit)));
+        }
+
+        return response;
+    }
+
+    private PropertySummaryResponse toPropertySummary(Property property) {
+        PropertySummaryResponse summary = new PropertySummaryResponse();
+        summary.setId(property.getId());
+        summary.setTitle(property.getTitle());
+        summary.setPropertyType(property.getPropertyType());
+        summary.setAddress(toAddressResponse(property.getAddress()));
+        summary.setRegistrationNumber(property.getRegistrationNumber());
+        return summary;
+    }
+
+    private RentalUnitSummaryResponse toRentalUnitSummary(RentalUnit unit) {
+        RentalUnitSummaryResponse summary = new RentalUnitSummaryResponse();
+        summary.setId(unit.getId());
+        summary.setUnitNumber(unit.getUnitNumber());
+        summary.setFloor(unit.getFloor());
+        summary.setRentAmount(unit.getRentAmount());
+        summary.setStatus(unit.getStatus());
+        return summary;
+    }
+
+    private AddressResponse toAddressResponse(Address address) {
+        if (address == null) {
+            return null;
+        }
+        AddressResponse response = new AddressResponse();
+        response.setStreet(address.getStreet());
+        response.setCity(address.getCity());
+        response.setState(address.getState());
+        response.setCountry(address.getCountry());
+        response.setPostalCode(address.getPostalCode());
+        response.setLandmark(address.getLandmark());
         return response;
     }
 }

@@ -19,4 +19,6 @@ public class LeaseResponse {
     private BigDecimal monthlyRent;
     private BigDecimal securityDeposit;
     private LeaseStatus status;
+    private PropertySummaryResponse property;
+    private RentalUnitSummaryResponse rentalUnit;
 }
