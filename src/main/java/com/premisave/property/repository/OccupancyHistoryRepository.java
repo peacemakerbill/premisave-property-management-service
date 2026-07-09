@@ -1,6 +1,7 @@
 package com.premisave.property.repository;
 
 import com.premisave.property.entity.OccupancyHistory;
+import com.premisave.property.enums.OccupancyType;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,10 +13,17 @@ public interface OccupancyHistoryRepository extends MongoRepository<OccupancyHis
 
     List<OccupancyHistory> findByRentalUnitId(String rentalUnitId);
 
+    List<OccupancyHistory> findByPropertyId(String propertyId);
+
     List<OccupancyHistory> findByTenantId(String tenantId);
 
     Optional<OccupancyHistory> findByRentalUnitIdAndTenantIdAndMoveOutDateIsNull(
             String rentalUnitId, String tenantId);
 
     Optional<OccupancyHistory> findByRentalUnitIdAndMoveOutDateIsNull(String rentalUnitId);
+
+    Optional<OccupancyHistory> findByLeaseIdAndMoveOutDateIsNull(String leaseId);
+
+    Optional<OccupancyHistory> findByPropertyIdAndOccupancyTypeAndMoveOutDateIsNull(
+            String propertyId, OccupancyType occupancyType);
 }

@@ -1,5 +1,6 @@
 package com.premisave.property.entity;
 
+import com.premisave.property.enums.OccupancyType;
 import lombok.Data;
 import org.springframework.data.annotation.*;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -13,7 +14,10 @@ public class OccupancyHistory {
     @Id
     private String id;
 
-    private String rentalUnitId;
+    private OccupancyType occupancyType;
+
+    private String rentalUnitId;   // null for WHOLE_PROPERTY occupancy
+    private String propertyId;
     private String tenantId;
     private String leaseId;
 
