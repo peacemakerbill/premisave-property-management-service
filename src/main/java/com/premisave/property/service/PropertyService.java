@@ -8,13 +8,15 @@ import com.premisave.property.dto.response.PropertyResponse;
 import com.premisave.property.entity.Address;
 import com.premisave.property.entity.GeoLocation;
 import com.premisave.property.entity.Property;
+import com.premisave.property.enums.LeaseStatus;
+import com.premisave.property.enums.UnitStatus;
 import com.premisave.property.exception.BadRequestException;
 import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.exception.UnauthorizedException;
+import com.premisave.property.repository.LeaseRepository;
 import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentalUnitRepository;
-import com.premisave.property.enums.UnitStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,19 +29,33 @@ public class PropertyService {
 
     private final PropertyRepository propertyRepository;
     private final RentalUnitRepository rentalUnitRepository;
+    private final LeaseRepository leaseRepository;
 
     @Transactional
     public PropertyResponse createProperty(CreatePropertyRequest request, String ownerId) {
         if (request.getTitle() == null || request.getTitle().isBlank()) {
             throw new BadRequestException("title is required");
         }
+        if (request.getRegistrationNumber() == null || request.getRegistrationNumber().isBlank()) {
+            throw new BadRequestException("registrationNumber is required");
+        }
+        if (request.getRegistrationType() == null) {
+            throw new BadRequestException("registrationType is required");
+        }
+
+        if (propertyRepository.existsByRegistrationNumber(request.getRegistrationNumber())) {
+            throw new ConflictException(
+                    "A property with this registration number is already registered");
+        }
 
         Property property = new Property();
         property.setOwnerId(ownerId);
         property.setTitle(request.getTitle());
-        property.setDescription(request.getDescription());
-        property.setPropertyType(request.getPropertyType());
+		property.setDescription(request.getDescription());
+		property.setPropertyType(request.getPropertyType());
         property.setAddress(toAddress(request.getAddress()));
+        property.setRegistrationNumber(request.getRegistrationNumber());
+        property.setRegistrationType(request.getRegistrationType());
 
         if (request.getLatitude() != null && request.getLongitude() != null) {
             GeoLocation location = new GeoLocation();
@@ -102,6 +118,11 @@ public class PropertyService {
                     "This property has occupied units and cannot be deleted. Terminate active leases first.");
         }
 
+        if (leaseRepository.existsByPropertyIdAndStatus(id, LeaseStatus.ACTIVE)) {
+            throw new ConflictException(
+                    "This property has an active lease and cannot be deleted. Terminate it first.");
+        }
+
         propertyRepository.delete(property);
     }
 
@@ -145,6 +166,8 @@ public class PropertyService {
         response.setDescription(property.getDescription());
         response.setPropertyType(property.getPropertyType());
         response.setAddress(toAddressResponse(property.getAddress()));
+        response.setRegistrationNumber(property.getRegistrationNumber());
+        response.setRegistrationType(property.getRegistrationType());
         response.setIsActive(property.getIsActive());
         response.setIsVerified(property.getIsVerified());
         response.setTotalUnits(property.getTotalUnits());
