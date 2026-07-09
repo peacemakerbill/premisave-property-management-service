@@ -1,9 +1,16 @@
 package com.premisave.property.service;
 
+import com.premisave.property.dto.response.AddressResponse;
 import com.premisave.property.dto.response.OccupancyResponse;
+import com.premisave.property.dto.response.PropertySummaryResponse;
+import com.premisave.property.dto.response.RentalUnitSummaryResponse;
+import com.premisave.property.dto.response.TenantSummaryResponse;
+import com.premisave.property.entity.Address;
 import com.premisave.property.entity.Lease;
 import com.premisave.property.entity.OccupancyHistory;
+import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentalUnit;
+import com.premisave.property.entity.Tenant;
 import com.premisave.property.enums.LeaseStatus;
 import com.premisave.property.enums.LeaseType;
 import com.premisave.property.enums.OccupancyType;
@@ -13,6 +20,7 @@ import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.LeaseRepository;
 import com.premisave.property.repository.OccupancyHistoryRepository;
+import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,10 +38,10 @@ public class OccupancyService {
     private final RentalUnitRepository rentalUnitRepository;
     private final LeaseRepository leaseRepository;
     private final TenantRepository tenantRepository;
+    private final PropertyRepository propertyRepository;
 
     // ------------------------------------------------------------------
-    // LEASE-BACKED occupancy — tenant, unit/property, and dates are all
-    // derived from an existing ACTIVE Lease.
+    // LEASE-BACKED occupancy
     // ------------------------------------------------------------------
 
     @Transactional
@@ -95,9 +103,7 @@ public class OccupancyService {
     }
 
     // ------------------------------------------------------------------
-    // DIRECT occupancy — no Lease involved. A tenant simply occupies a
-    // rental unit informally. This service owns the unit's status here,
-    // since there's no LeaseService step to do it instead.
+    // DIRECT occupancy — no Lease involved
     // ------------------------------------------------------------------
 
     @Transactional
@@ -155,7 +161,7 @@ public class OccupancyService {
     }
 
     // ------------------------------------------------------------------
-    // Read endpoints — shared across both flows
+    // Read endpoints
     // ------------------------------------------------------------------
 
     public List<OccupancyResponse> getUnitHistory(String rentalUnitId) {
@@ -204,6 +210,65 @@ public class OccupancyService {
         response.setLeaseId(history.getLeaseId());
         response.setMoveInDate(history.getMoveInDate());
         response.setMoveOutDate(history.getMoveOutDate());
+
+        if (history.getPropertyId() != null) {
+            propertyRepository.findById(history.getPropertyId())
+                    .ifPresent(property -> response.setProperty(toPropertySummary(property)));
+        }
+
+        if (history.getRentalUnitId() != null) {
+            rentalUnitRepository.findById(history.getRentalUnitId())
+                    .ifPresent(unit -> response.setRentalUnit(toRentalUnitSummary(unit)));
+        }
+
+        if (history.getTenantId() != null) {
+            tenantRepository.findById(history.getTenantId())
+                    .ifPresent(tenant -> response.setTenant(toTenantSummary(tenant)));
+        }
+
+        return response;
+    }
+
+    private PropertySummaryResponse toPropertySummary(Property property) {
+        PropertySummaryResponse summary = new PropertySummaryResponse();
+        summary.setId(property.getId());
+        summary.setTitle(property.getTitle());
+        summary.setPropertyType(property.getPropertyType());
+        summary.setAddress(toAddressResponse(property.getAddress()));
+        summary.setRegistrationNumber(property.getRegistrationNumber());
+        return summary;
+    }
+
+    private RentalUnitSummaryResponse toRentalUnitSummary(RentalUnit unit) {
+        RentalUnitSummaryResponse summary = new RentalUnitSummaryResponse();
+        summary.setId(unit.getId());
+        summary.setUnitNumber(unit.getUnitNumber());
+        summary.setFloor(unit.getFloor());
+        summary.setRentAmount(unit.getRentAmount());
+        summary.setStatus(unit.getStatus());
+        return summary;
+    }
+
+    private TenantSummaryResponse toTenantSummary(Tenant tenant) {
+        TenantSummaryResponse summary = new TenantSummaryResponse();
+        summary.setId(tenant.getId());
+        summary.setFullName(tenant.getFullName());
+        summary.setPhoneNumber(tenant.getPhoneNumber());
+        summary.setEmail(tenant.getEmail());
+        return summary;
+    }
+
+    private AddressResponse toAddressResponse(Address address) {
+        if (address == null) {
+            return null;
+        }
+        AddressResponse response = new AddressResponse();
+        response.setStreet(address.getStreet());
+        response.setCity(address.getCity());
+        response.setState(address.getState());
+        response.setCountry(address.getCountry());
+        response.setPostalCode(address.getPostalCode());
+        response.setLandmark(address.getLandmark());
         return response;
     }
 }

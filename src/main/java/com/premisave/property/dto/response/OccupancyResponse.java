@@ -15,4 +15,7 @@ public class OccupancyResponse {
     private String leaseId;
     private LocalDateTime moveInDate;
     private LocalDateTime moveOutDate;
+    private PropertySummaryResponse property;
+    private RentalUnitSummaryResponse rentalUnit;
+    private TenantSummaryResponse tenant;
 }
