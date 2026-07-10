@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/owners")
 @RequiredArgsConstructor
@@ -29,6 +31,13 @@ public class OwnerController {
     public ResponseEntity<OwnerResponse> getMyOwnerProfile(HttpServletRequest httpRequest) {
         String userId = resolveUserId(httpRequest);
         return ResponseEntity.ok(ownerService.getOwnerByUserId(userId));
+    }
+
+    @GetMapping("/me/exists")
+    public ResponseEntity<Map<String, Boolean>> checkMyOwnerProfileExists(HttpServletRequest httpRequest) {
+        String userId = resolveUserId(httpRequest);
+        boolean exists = ownerService.existsByUserId(userId);
+        return ResponseEntity.ok(Map.of("exists", exists));
     }
 
     @GetMapping("/{id}")

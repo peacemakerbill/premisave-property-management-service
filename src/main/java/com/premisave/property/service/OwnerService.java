@@ -52,6 +52,10 @@ public class OwnerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Owner profile not found"));
     }
 
+    public boolean existsByUserId(String userId) {
+        return ownerRepository.findByUserId(userId).isPresent();
+    }
+
     @Transactional
     public OwnerResponse updateOwner(String id, UpdateOwnerRequest request, String userId) {
         Owner owner = findOwnerOrThrow(id);
