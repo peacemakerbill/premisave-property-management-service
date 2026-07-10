@@ -5,6 +5,8 @@ import com.premisave.property.dto.request.UpdateMaintenanceStatusRequest;
 import com.premisave.property.dto.response.MaintenanceResponse;
 import com.premisave.property.enums.MaintenanceStatus;
 import com.premisave.property.service.MaintenanceService;
+import com.premisave.property.service.TenantService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,11 +20,13 @@ import java.util.List;
 public class MaintenanceController {
 
     private final MaintenanceService maintenanceService;
+    private final TenantService tenantService;
 
     @PostMapping
-    public ResponseEntity<MaintenanceResponse> createMaintenanceRequest(@Valid @RequestBody MaintenanceRequest request) {
-        // tenantId from SecurityContext
-        MaintenanceResponse response = maintenanceService.createMaintenanceRequest(request, "tenant-id-from-jwt");
+    public ResponseEntity<MaintenanceResponse> createMaintenanceRequest(@Valid @RequestBody MaintenanceRequest request,
+                                                                          HttpServletRequest httpRequest) {
+        String tenantId = resolveTenantId(httpRequest);
+        MaintenanceResponse response = maintenanceService.createMaintenanceRequest(request, tenantId);
         return ResponseEntity.ok(response);
     }
 
@@ -51,5 +55,10 @@ public class MaintenanceController {
     public ResponseEntity<MaintenanceResponse> updateStatus(@PathVariable String id,
                                                               @Valid @RequestBody UpdateMaintenanceStatusRequest request) {
         return ResponseEntity.ok(maintenanceService.updateStatus(id, request));
+    }
+
+    private String resolveTenantId(HttpServletRequest httpRequest) {
+        String userId = (String) httpRequest.getAttribute("userId");
+        return tenantService.getTenantByUserId(userId).getId();
     }
 }

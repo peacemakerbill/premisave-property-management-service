@@ -9,6 +9,7 @@ public class MaintenanceResponse {
     private String id;
     private String tenantId;
     private String rentalUnitId;
+    private RentalUnitSummaryResponse rentalUnit;
     private String title;
     private String description;
     private String status;
