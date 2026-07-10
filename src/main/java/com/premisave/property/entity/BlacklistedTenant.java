@@ -17,6 +17,9 @@ public class BlacklistedTenant {
     private String reason;
     private String notes;
 
+    private String rentalUnitId;   // unit the tenant was in at time of blacklisting, if known
+    private String propertyId;     // property the tenant was in at time of blacklisting, if known
+
     private LocalDateTime blacklistedAt;
     private LocalDateTime expiresAt;
 

@@ -9,4 +9,6 @@ public class BlacklistedTenantResponse {
     private String tenantId;
     private String reason;
     private LocalDateTime blacklistedAt;
+    private RentalUnitSummaryResponse rentalUnit;
+    private PropertySummaryResponse property;
 }

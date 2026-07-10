@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/blacklisted-tenants")
@@ -23,9 +24,9 @@ public class BlacklistedTenantController {
     }
 
     @DeleteMapping("/{tenantId}")
-    public ResponseEntity<Void> removeFromBlacklist(@PathVariable String tenantId) {
+    public ResponseEntity<Map<String, String>> removeFromBlacklist(@PathVariable String tenantId) {
         blacklistedTenantService.removeFromBlacklist(tenantId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(Map.of("message", "Tenant has been removed from the blacklist successfully"));
     }
 
     @GetMapping("/{tenantId}")
