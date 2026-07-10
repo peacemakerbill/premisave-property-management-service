@@ -3,6 +3,7 @@ package com.premisave.property.controller;
 import com.premisave.property.dto.request.CompleteInspectionRequest;
 import com.premisave.property.dto.request.CreateInspectionRequest;
 import com.premisave.property.dto.response.InspectionResponse;
+import com.premisave.property.enums.InspectionStatus;
 import com.premisave.property.service.InspectionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -49,17 +50,31 @@ public class InspectionController {
     }
 
     @GetMapping("/unit/{rentalUnitId}")
+    @PreAuthorize("hasRole('HOME_OWNER')")
     public ResponseEntity<List<InspectionResponse>> getInspectionsByUnit(@PathVariable String rentalUnitId) {
         return ResponseEntity.ok(inspectionService.getInspectionsByUnit(rentalUnitId));
     }
 
     @GetMapping("/inspector/{inspectorUserId}")
-    public ResponseEntity<List<InspectionResponse>> getInspectionsByInspector(@PathVariable String inspectorUserId) {
-        return ResponseEntity.ok(inspectionService.getInspectionsByInspector(inspectorUserId));
+    public ResponseEntity<List<InspectionResponse>> getInspectionsByInspector(@PathVariable String inspectorUserId,
+                                                                                HttpServletRequest httpRequest) {
+        String callerUserId = (String) httpRequest.getAttribute("userId");
+        return ResponseEntity.ok(inspectionService.getInspectionsByInspector(inspectorUserId, callerUserId));
     }
 
     @GetMapping("/created-by/{createdByUserId}")
-    public ResponseEntity<List<InspectionResponse>> getInspectionsCreatedBy(@PathVariable String createdByUserId) {
-        return ResponseEntity.ok(inspectionService.getInspectionsCreatedBy(createdByUserId));
+    @PreAuthorize("hasRole('HOME_OWNER')")
+    public ResponseEntity<List<InspectionResponse>> getInspectionsCreatedBy(@PathVariable String createdByUserId,
+                                                                               HttpServletRequest httpRequest) {
+        String callerUserId = (String) httpRequest.getAttribute("userId");
+        return ResponseEntity.ok(inspectionService.getInspectionsCreatedBy(createdByUserId, callerUserId));
+    }
+
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('HOME_OWNER')")
+    public ResponseEntity<List<InspectionResponse>> getMyInspectionsByStatus(
+            @RequestParam InspectionStatus status, HttpServletRequest httpRequest) {
+        String userId = (String) httpRequest.getAttribute("userId");
+        return ResponseEntity.ok(inspectionService.getMyInspectionsByStatus(userId, status));
     }
 }

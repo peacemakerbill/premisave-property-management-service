@@ -17,6 +17,8 @@ public interface InspectionRepository extends MongoRepository<Inspection, String
 
     List<Inspection> findByCreatedByUserId(String createdByUserId);
 
+    List<Inspection> findByCreatedByUserIdAndStatus(String createdByUserId, InspectionStatus status);
+
     List<Inspection> findByRentalUnitIdAndScheduledDateAndStatusNot(
             String rentalUnitId, LocalDate scheduledDate, InspectionStatus excludedStatus);
 }

@@ -14,6 +14,7 @@ import com.premisave.property.exception.UnauthorizedException;
 import com.premisave.property.repository.InspectionRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -118,14 +119,32 @@ public class InspectionService {
                 .toList();
     }
 
-    public List<InspectionResponse> getInspectionsByInspector(String inspectorUserId) {
+    public List<InspectionResponse> getInspectionsByInspector(String inspectorUserId, String callerUserId) {
+        boolean isSelf = inspectorUserId.equals(callerUserId);
+        boolean isHomeOwner = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_HOME_OWNER"));
+
+        if (!isSelf && !isHomeOwner) {
+            throw new UnauthorizedException("You can only view your own assigned inspections");
+        }
+
         return inspectionRepository.findByInspectorUserId(inspectorUserId).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public List<InspectionResponse> getInspectionsCreatedBy(String createdByUserId) {
+    public List<InspectionResponse> getInspectionsCreatedBy(String createdByUserId, String callerUserId) {
+        if (!createdByUserId.equals(callerUserId)) {
+            throw new UnauthorizedException("You can only view inspections you created");
+        }
+
         return inspectionRepository.findByCreatedByUserId(createdByUserId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<InspectionResponse> getMyInspectionsByStatus(String createdByUserId, InspectionStatus status) {
+        return inspectionRepository.findByCreatedByUserIdAndStatus(createdByUserId, status).stream()
                 .map(this::toResponse)
                 .toList();
     }
