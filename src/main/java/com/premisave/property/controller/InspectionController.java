@@ -1,12 +1,14 @@
 package com.premisave.property.controller;
 
-import com.premisave.property.dto.request.InspectionRequest;
-import com.premisave.property.dto.request.UpdateInspectionRequest;
+import com.premisave.property.dto.request.CompleteInspectionRequest;
+import com.premisave.property.dto.request.CreateInspectionRequest;
 import com.premisave.property.dto.response.InspectionResponse;
 import com.premisave.property.service.InspectionService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,9 +21,26 @@ public class InspectionController {
     private final InspectionService inspectionService;
 
     @PostMapping
-    public ResponseEntity<InspectionResponse> createInspection(@Valid @RequestBody InspectionRequest request) {
-        // inspectorId from SecurityContext
-        return ResponseEntity.ok(inspectionService.createInspection(request, "inspector-id-from-jwt"));
+    @PreAuthorize("hasRole('HOME_OWNER')")
+    public ResponseEntity<InspectionResponse> createInspection(@Valid @RequestBody CreateInspectionRequest request,
+                                                                  HttpServletRequest httpRequest) {
+        String createdByUserId = (String) httpRequest.getAttribute("userId");
+        return ResponseEntity.ok(inspectionService.createInspection(request, createdByUserId));
+    }
+
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<InspectionResponse> completeInspection(@PathVariable String id,
+                                                                     @Valid @RequestBody CompleteInspectionRequest request,
+                                                                     HttpServletRequest httpRequest) {
+        String userId = (String) httpRequest.getAttribute("userId");
+        return ResponseEntity.ok(inspectionService.completeInspection(id, request, userId));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasRole('HOME_OWNER')")
+    public ResponseEntity<InspectionResponse> cancelInspection(@PathVariable String id, HttpServletRequest httpRequest) {
+        String userId = (String) httpRequest.getAttribute("userId");
+        return ResponseEntity.ok(inspectionService.cancelInspection(id, userId));
     }
 
     @GetMapping("/{id}")
@@ -34,14 +53,13 @@ public class InspectionController {
         return ResponseEntity.ok(inspectionService.getInspectionsByUnit(rentalUnitId));
     }
 
-    @GetMapping("/inspector/{inspectorId}")
-    public ResponseEntity<List<InspectionResponse>> getInspectionsByInspector(@PathVariable String inspectorId) {
-        return ResponseEntity.ok(inspectionService.getInspectionsByInspector(inspectorId));
+    @GetMapping("/inspector/{inspectorUserId}")
+    public ResponseEntity<List<InspectionResponse>> getInspectionsByInspector(@PathVariable String inspectorUserId) {
+        return ResponseEntity.ok(inspectionService.getInspectionsByInspector(inspectorUserId));
     }
 
-    @PatchMapping("/{id}")
-    public ResponseEntity<InspectionResponse> updateFindings(@PathVariable String id,
-                                                               @RequestBody UpdateInspectionRequest request) {
-        return ResponseEntity.ok(inspectionService.updateFindings(id, request));
+    @GetMapping("/created-by/{createdByUserId}")
+    public ResponseEntity<List<InspectionResponse>> getInspectionsCreatedBy(@PathVariable String createdByUserId) {
+        return ResponseEntity.ok(inspectionService.getInspectionsCreatedBy(createdByUserId));
     }
 }
