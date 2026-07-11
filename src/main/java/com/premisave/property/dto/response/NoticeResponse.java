@@ -10,6 +10,7 @@ public class NoticeResponse {
     private String id;
     private String tenantId;
     private String leaseId;
+    private String rentalUnitId;
     private NoticeType noticeType;
     private String title;
     private String content;

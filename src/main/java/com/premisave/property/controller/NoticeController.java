@@ -1,6 +1,7 @@
 package com.premisave.property.controller;
 
-import com.premisave.property.dto.request.NoticeRequest;
+import com.premisave.property.dto.request.LeaseNoticeRequest;
+import com.premisave.property.dto.request.UnitNoticeRequest;
 import com.premisave.property.dto.response.NoticeResponse;
 import com.premisave.property.enums.NoticeType;
 import com.premisave.property.service.NoticeService;
@@ -18,9 +19,16 @@ public class NoticeController {
 
     private final NoticeService noticeService;
 
-    @PostMapping
-    public ResponseEntity<NoticeResponse> sendNotice(@Valid @RequestBody NoticeRequest request) {
-        return ResponseEntity.ok(noticeService.sendNotice(request));
+    // For tenants occupying a rental unit directly, with no lease.
+    @PostMapping("/unit")
+    public ResponseEntity<NoticeResponse> sendUnitNotice(@Valid @RequestBody UnitNoticeRequest request) {
+        return ResponseEntity.ok(noticeService.sendUnitNotice(request));
+    }
+
+    // For tenants under an active/renewed lease.
+    @PostMapping("/lease")
+    public ResponseEntity<NoticeResponse> sendLeaseNotice(@Valid @RequestBody LeaseNoticeRequest request) {
+        return ResponseEntity.ok(noticeService.sendLeaseNotice(request));
     }
 
     @GetMapping("/{id}")
