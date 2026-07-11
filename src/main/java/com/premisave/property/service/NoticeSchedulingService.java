@@ -191,7 +191,9 @@ public class NoticeSchedulingService {
 
         if (channels.contains(NotificationChannel.EMAIL)) {
             String email = notice.getTenant() != null ? notice.getTenant().getEmail() : null;
-            result.setEmailSent(emailService.sendNoticeEmail(email, notice.getTitle(), notice.getContent()));
+            String tenantName = notice.getTenant() != null ? notice.getTenant().getFullName() : null;
+            result.setEmailSent(emailService.sendNoticeEmail(
+                    email, tenantName, notice.getTitle(), notice.getNoticeType().name(), notice.getContent()));
         }
 
         if (channels.contains(NotificationChannel.SMS)) {
