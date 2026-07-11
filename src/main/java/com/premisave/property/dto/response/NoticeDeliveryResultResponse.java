@@ -13,4 +13,5 @@ public class NoticeDeliveryResultResponse {
     private String errorMessage;
     private boolean emailSent;
     private boolean smsRequested;
+    private boolean smsSent;
 }

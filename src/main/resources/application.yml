@@ -74,6 +74,14 @@ notifications:
   email:
     from: ${NOTICE_EMAIL_FROM:no-reply@premisave.com}
 
+# Twilio (SMS notice delivery). No defaults on purpose — if these are blank,
+# SmsService logs a warning and skips sending rather than failing the notice.
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  from-number: ${TWILIO_FROM_NUMBER:}
+  default-country-code: ${TWILIO_DEFAULT_COUNTRY_CODE:+254}
+
 # ── Logging ──
 logging:
   level:

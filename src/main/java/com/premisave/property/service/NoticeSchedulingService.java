@@ -197,7 +197,7 @@ public class NoticeSchedulingService {
         if (channels.contains(NotificationChannel.SMS)) {
             result.setSmsRequested(true);
             String phone = notice.getTenant() != null ? notice.getTenant().getPhoneNumber() : null;
-            smsService.sendNoticeSms(phone, notice.getTitle() + ": " + notice.getContent()); // TODO: no-op today
+            result.setSmsSent(smsService.sendNoticeSms(phone, notice.getTitle() + ": " + notice.getContent()));
         }
     }
 
@@ -308,6 +308,7 @@ public class NoticeSchedulingService {
         response.setErrorMessage(result.getErrorMessage());
         response.setEmailSent(result.isEmailSent());
         response.setSmsRequested(result.isSmsRequested());
+        response.setSmsSent(result.isSmsSent());
         return response;
     }
 }

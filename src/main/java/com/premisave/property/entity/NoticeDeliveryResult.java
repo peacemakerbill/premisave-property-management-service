@@ -20,5 +20,6 @@ public class NoticeDeliveryResult {
     private String errorMessage;   // set only on failure (e.g. duplicate within 24h, DRAFT lease, vacant unit)
 
     private boolean emailSent;
-    private boolean smsRequested;  // true if SMS was selected — actual sending is not yet implemented
+    private boolean smsRequested;  // true if SMS was selected as a delivery channel
+    private boolean smsSent;       // true only if Twilio confirmed the send succeeded
 }
