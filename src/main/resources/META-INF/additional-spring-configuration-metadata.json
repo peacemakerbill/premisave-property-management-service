@@ -45,6 +45,33 @@
       "type": "java.lang.String",
       "description": "Base URL of the frontend application, used when building links (e.g. activation, reset-password) sent back to clients.",
       "defaultValue": "http://localhost:3000"
+    },
+    {
+      "name": "notifications.email.from",
+      "type": "java.lang.String",
+      "description": "Display 'From' address used when sending notice emails (EmailService). Independent of the SMTP login configured under spring.mail.username.",
+      "defaultValue": "no-reply@premisave.com"
+    },
+    {
+      "name": "twilio.account-sid",
+      "type": "java.lang.String",
+      "description": "Twilio Account SID, used to initialize the Twilio SDK (TwilioConfig) and authenticate SMS notice delivery (SmsService). If blank, SMS sending is skipped rather than failing."
+    },
+    {
+      "name": "twilio.auth-token",
+      "type": "java.lang.String",
+      "description": "Twilio Auth Token, used alongside twilio.account-sid to initialize the Twilio SDK (TwilioConfig). If blank, SMS sending is skipped rather than failing."
+    },
+    {
+      "name": "twilio.from-number",
+      "type": "java.lang.String",
+      "description": "Twilio phone number (E.164 format) that notice SMS messages are sent from (SmsService). If blank, SMS sending is skipped rather than failing."
+    },
+    {
+      "name": "twilio.default-country-code",
+      "type": "java.lang.String",
+      "description": "Country code prepended to tenant/owner phone numbers that aren't already in E.164 format before sending via Twilio (SmsService).",
+      "defaultValue": "+254"
     }
   ]
 }
