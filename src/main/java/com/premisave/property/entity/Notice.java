@@ -16,7 +16,8 @@ public class Notice {
 
     private String tenantId;
     private String leaseId;        // set for lease-backed notices, null for direct-unit notices
-    private String rentalUnitId;   // set for direct-unit notices and lease-backed unit leases; null for whole-property leases
+    private String rentalUnitId;   // set for unit-based notices; null for whole-property lease notices
+    private String propertyId;     // always set (resolved from unit or lease) so reads can show property context
 
     private NoticeType noticeType;
     private String title;

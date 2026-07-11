@@ -2,10 +2,18 @@ package com.premisave.property.service;
 
 import com.premisave.property.dto.request.LeaseNoticeRequest;
 import com.premisave.property.dto.request.UnitNoticeRequest;
+import com.premisave.property.dto.response.AddressResponse;
 import com.premisave.property.dto.response.NoticeResponse;
+import com.premisave.property.dto.response.PropertySummaryResponse;
+import com.premisave.property.dto.response.RentalUnitSummaryResponse;
+import com.premisave.property.dto.response.TenantSummaryResponse;
+import com.premisave.property.entity.Address;
 import com.premisave.property.entity.Lease;
 import com.premisave.property.entity.Notice;
 import com.premisave.property.entity.OccupancyHistory;
+import com.premisave.property.entity.Property;
+import com.premisave.property.entity.RentalUnit;
+import com.premisave.property.entity.Tenant;
 import com.premisave.property.enums.LeaseStatus;
 import com.premisave.property.enums.NoticeType;
 import com.premisave.property.exception.BadRequestException;
@@ -14,6 +22,7 @@ import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.LeaseRepository;
 import com.premisave.property.repository.NoticeRepository;
 import com.premisave.property.repository.OccupancyHistoryRepository;
+import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +42,7 @@ public class NoticeService {
     private final TenantRepository tenantRepository;
     private final RentalUnitRepository rentalUnitRepository;
     private final LeaseRepository leaseRepository;
+    private final PropertyRepository propertyRepository;
     private final OccupancyHistoryRepository occupancyHistoryRepository;
 
     // ------------------------------------------------------------------
@@ -41,7 +51,7 @@ public class NoticeService {
 
     @Transactional
     public NoticeResponse sendUnitNotice(UnitNoticeRequest request) {
-        rentalUnitRepository.findById(request.getRentalUnitId())
+        RentalUnit unit = rentalUnitRepository.findById(request.getRentalUnitId())
                 .orElseThrow(() -> new ResourceNotFoundException("Rental unit not found"));
 
         OccupancyHistory occupancy = occupancyHistoryRepository
@@ -69,7 +79,8 @@ public class NoticeService {
 
         Notice notice = new Notice();
         notice.setTenantId(tenantId);
-        notice.setRentalUnitId(request.getRentalUnitId());
+        notice.setRentalUnitId(unit.getId());
+        notice.setPropertyId(unit.getPropertyId());
         notice.setLeaseId(null);
         notice.setNoticeType(request.getNoticeType());
         notice.setTitle(request.getTitle());
@@ -102,6 +113,7 @@ public class NoticeService {
         notice.setTenantId(lease.getTenantId());
         notice.setLeaseId(lease.getId());
         notice.setRentalUnitId(lease.getRentalUnitId()); // null for whole-property leases
+        notice.setPropertyId(lease.getPropertyId());
         notice.setNoticeType(request.getNoticeType());
         notice.setTitle(request.getTitle());
         notice.setContent(request.getContent());
@@ -151,16 +163,80 @@ public class NoticeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Notice not found"));
     }
 
+    // ------------------------------------------------------------------
+    // Mapping
+    // ------------------------------------------------------------------
+
     private NoticeResponse toResponse(Notice notice) {
         NoticeResponse response = new NoticeResponse();
         response.setId(notice.getId());
         response.setTenantId(notice.getTenantId());
         response.setLeaseId(notice.getLeaseId());
         response.setRentalUnitId(notice.getRentalUnitId());
+        response.setPropertyId(notice.getPropertyId());
         response.setNoticeType(notice.getNoticeType());
         response.setTitle(notice.getTitle());
         response.setContent(notice.getContent());
         response.setSentAt(notice.getSentAt());
+
+        if (notice.getTenantId() != null) {
+            tenantRepository.findById(notice.getTenantId())
+                    .ifPresent(tenant -> response.setTenant(toTenantSummary(tenant)));
+        }
+
+        if (notice.getRentalUnitId() != null) {
+            rentalUnitRepository.findById(notice.getRentalUnitId())
+                    .ifPresent(unit -> response.setRentalUnit(toRentalUnitSummary(unit)));
+        }
+
+        if (notice.getPropertyId() != null) {
+            propertyRepository.findById(notice.getPropertyId())
+                    .ifPresent(property -> response.setProperty(toPropertySummary(property)));
+        }
+
+        return response;
+    }
+
+    private TenantSummaryResponse toTenantSummary(Tenant tenant) {
+        TenantSummaryResponse summary = new TenantSummaryResponse();
+        summary.setId(tenant.getId());
+        summary.setFullName(tenant.getFullName());
+        summary.setPhoneNumber(tenant.getPhoneNumber());
+        summary.setEmail(tenant.getEmail());
+        return summary;
+    }
+
+    private RentalUnitSummaryResponse toRentalUnitSummary(RentalUnit unit) {
+        RentalUnitSummaryResponse summary = new RentalUnitSummaryResponse();
+        summary.setId(unit.getId());
+        summary.setUnitNumber(unit.getUnitNumber());
+        summary.setFloor(unit.getFloor());
+        summary.setRentAmount(unit.getRentAmount());
+        summary.setStatus(unit.getStatus());
+        return summary;
+    }
+
+    private PropertySummaryResponse toPropertySummary(Property property) {
+        PropertySummaryResponse summary = new PropertySummaryResponse();
+        summary.setId(property.getId());
+        summary.setTitle(property.getTitle());
+        summary.setPropertyType(property.getPropertyType());
+        summary.setAddress(toAddressResponse(property.getAddress()));
+        summary.setRegistrationNumber(property.getRegistrationNumber());
+        return summary;
+    }
+
+    private AddressResponse toAddressResponse(Address address) {
+        if (address == null) {
+            return null;
+        }
+        AddressResponse response = new AddressResponse();
+        response.setStreet(address.getStreet());
+        response.setCity(address.getCity());
+        response.setState(address.getState());
+        response.setCountry(address.getCountry());
+        response.setPostalCode(address.getPostalCode());
+        response.setLandmark(address.getLandmark());
         return response;
     }
 }

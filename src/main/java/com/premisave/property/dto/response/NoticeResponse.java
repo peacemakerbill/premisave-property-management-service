@@ -11,8 +11,13 @@ public class NoticeResponse {
     private String tenantId;
     private String leaseId;
     private String rentalUnitId;
+    private String propertyId;
     private NoticeType noticeType;
     private String title;
     private String content;
     private LocalDateTime sentAt;
+
+    private TenantSummaryResponse tenant;
+    private RentalUnitSummaryResponse rentalUnit;
+    private PropertySummaryResponse property;
 }
