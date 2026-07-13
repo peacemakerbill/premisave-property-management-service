@@ -82,6 +82,12 @@ twilio:
   from-number: ${TWILIO_FROM_NUMBER:}
   default-country-code: ${TWILIO_DEFAULT_COUNTRY_CODE:+254}
 
+# Utility billing rates (KES charged per unit of metered consumption)
+utility:
+  rates:
+    electricity: ${UTILITY_RATE_ELECTRICITY:20}
+    water: ${UTILITY_RATE_WATER:200}
+
 # ── Logging ──
 logging:
   level:

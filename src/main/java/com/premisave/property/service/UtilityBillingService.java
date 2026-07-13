@@ -1,5 +1,6 @@
 package com.premisave.property.service;
 
+import com.premisave.property.config.UtilityRatesProperties;
 import com.premisave.property.dto.request.GenerateBillFromReadingRequest;
 import com.premisave.property.dto.request.PayUtilityBillRequest;
 import com.premisave.property.dto.request.UtilityBillRequest;
@@ -7,6 +8,7 @@ import com.premisave.property.dto.response.UtilityBillResponse;
 import com.premisave.property.entity.MeterReading;
 import com.premisave.property.entity.OccupancyHistory;
 import com.premisave.property.entity.UtilityBill;
+import com.premisave.property.enums.MeterType;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.UtilityType;
 import com.premisave.property.exception.BadRequestException;
@@ -28,6 +30,7 @@ public class UtilityBillingService {
     private final UtilityBillRepository utilityBillRepository;
     private final OccupancyHistoryRepository occupancyHistoryRepository;
     private final MeterReadingRepository meterReadingRepository;
+    private final UtilityRatesProperties utilityRatesProperties;
 
     @Transactional
     public UtilityBillResponse generateBill(UtilityBillRequest request) {
@@ -56,12 +59,14 @@ public class UtilityBillingService {
         }
 
         String tenantId = resolveCurrentTenant(reading.getRentalUnitId());
-        BigDecimal amount = reading.getConsumption().multiply(request.getRatePerUnit());
+        UtilityType utilityType = resolveUtilityType(reading.getMeterType());
+        BigDecimal ratePerUnit = resolveRatePerUnit(utilityType, request.getRatePerUnit());
+        BigDecimal amount = reading.getConsumption().multiply(ratePerUnit);
 
         UtilityBill bill = new UtilityBill();
         bill.setTenantId(tenantId);
         bill.setRentalUnitId(reading.getRentalUnitId());
-        bill.setUtilityType(resolveUtilityType(reading.getMeterType()));
+        bill.setUtilityType(utilityType);
         bill.setAmount(amount);
         bill.setAmountPaid(BigDecimal.ZERO);
         bill.setStatus(PaymentStatus.PENDING);
@@ -112,12 +117,27 @@ public class UtilityBillingService {
                 .orElseThrow(() -> new BadRequestException("This unit currently has no active tenant"));
     }
 
-    private UtilityType resolveUtilityType(String meterType) {
+    private UtilityType resolveUtilityType(MeterType meterType) {
         try {
-            return UtilityType.valueOf(meterType.toUpperCase());
+            return UtilityType.valueOf(meterType.name());
         } catch (IllegalArgumentException ex) {
             return UtilityType.OTHER;
         }
+    }
+
+    private BigDecimal resolveRatePerUnit(UtilityType utilityType, BigDecimal requestedRate) {
+        if (requestedRate != null) {
+            return requestedRate;
+        }
+
+        BigDecimal configuredRate = utilityRatesProperties.getRateFor(utilityType);
+        if (configuredRate == null) {
+            throw new BadRequestException(
+                    "No configured rate for utility type " + utilityType
+                            + "; please provide a ratePerUnit override");
+        }
+
+        return configuredRate;
     }
 
     private UtilityBill findOrThrow(String id) {

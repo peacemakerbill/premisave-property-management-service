@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -26,6 +28,18 @@ public class MeterReadingService {
         }
         if (request.getCurrentReading() == null) {
             throw new BadRequestException("currentReading is required");
+        }
+
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1);
+
+        boolean alreadyRecordedToday = meterReadingRepository
+                .existsByRentalUnitIdAndMeterTypeAndReadingDateBetween(
+                        request.getRentalUnitId(), request.getMeterType(), startOfDay, endOfDay);
+
+        if (alreadyRecordedToday) {
+            throw new BadRequestException(
+                    "A meter reading for this unit and meter type has already been recorded today");
         }
 
         BigDecimal previousReading = meterReadingRepository
@@ -55,12 +69,6 @@ public class MeterReadingService {
 
     public List<MeterReadingResponse> getReadingsByUnit(String rentalUnitId) {
         return meterReadingRepository.findByRentalUnitId(rentalUnitId).stream()
-                .map(this::toResponse)
-                .toList();
-    }
-
-    public List<MeterReadingResponse> getReadingsByUnitAndType(String rentalUnitId, String meterType) {
-        return meterReadingRepository.findByRentalUnitIdAndMeterType(rentalUnitId, meterType).stream()
                 .map(this::toResponse)
                 .toList();
     }

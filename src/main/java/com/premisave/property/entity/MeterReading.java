@@ -4,6 +4,8 @@ import lombok.Data;
 import org.springframework.data.annotation.*;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import com.premisave.property.enums.MeterType;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -17,7 +19,7 @@ public class MeterReading {
     private String rentalUnitId;
     private String tenantId;
 
-    private String meterType; // ELECTRICITY, WATER, etc.
+    private MeterType meterType;
     private BigDecimal previousReading;
     private BigDecimal currentReading;
     private BigDecimal consumption;

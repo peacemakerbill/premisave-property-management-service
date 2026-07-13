@@ -33,9 +33,4 @@ public class MeterReadingController {
         return ResponseEntity.ok(meterReadingService.getReadingsByUnit(rentalUnitId));
     }
 
-    @GetMapping("/unit/{rentalUnitId}/type/{meterType}")
-    public ResponseEntity<List<MeterReadingResponse>> getReadingsByUnitAndType(
-            @PathVariable String rentalUnitId, @PathVariable String meterType) {
-        return ResponseEntity.ok(meterReadingService.getReadingsByUnitAndType(rentalUnitId, meterType));
-    }
 }
