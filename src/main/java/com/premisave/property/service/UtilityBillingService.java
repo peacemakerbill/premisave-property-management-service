@@ -4,9 +4,15 @@ import com.premisave.property.config.UtilityRatesProperties;
 import com.premisave.property.dto.request.GenerateBillFromReadingRequest;
 import com.premisave.property.dto.request.PayUtilityBillRequest;
 import com.premisave.property.dto.request.UtilityBillRequest;
+import com.premisave.property.dto.response.PropertySummaryResponse;
+import com.premisave.property.dto.response.RentalUnitSummaryResponse;
+import com.premisave.property.dto.response.TenantSummaryResponse;
 import com.premisave.property.dto.response.UtilityBillResponse;
 import com.premisave.property.entity.MeterReading;
 import com.premisave.property.entity.OccupancyHistory;
+import com.premisave.property.entity.Property;
+import com.premisave.property.entity.RentalUnit;
+import com.premisave.property.entity.Tenant;
 import com.premisave.property.entity.UtilityBill;
 import com.premisave.property.enums.MeterType;
 import com.premisave.property.enums.PaymentStatus;
@@ -16,6 +22,9 @@ import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.MeterReadingRepository;
 import com.premisave.property.repository.OccupancyHistoryRepository;
+import com.premisave.property.repository.PropertyRepository;
+import com.premisave.property.repository.RentalUnitRepository;
+import com.premisave.property.repository.TenantRepository;
 import com.premisave.property.repository.UtilityBillRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,6 +41,9 @@ public class UtilityBillingService {
     private final UtilityBillRepository utilityBillRepository;
     private final OccupancyHistoryRepository occupancyHistoryRepository;
     private final MeterReadingRepository meterReadingRepository;
+    private final RentalUnitRepository rentalUnitRepository;
+    private final TenantRepository tenantRepository;
+    private final PropertyRepository propertyRepository;
     private final UtilityRatesProperties utilityRatesProperties;
 
     @Transactional
@@ -194,6 +206,10 @@ public class UtilityBillingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Utility bill not found"));
     }
 
+    // ------------------------------------------------------------------
+    // Mapping
+    // ------------------------------------------------------------------
+
     private UtilityBillResponse toResponse(UtilityBill bill) {
         UtilityBillResponse response = new UtilityBillResponse();
         response.setId(bill.getId());
@@ -205,6 +221,54 @@ public class UtilityBillingService {
         response.setStatus(bill.getStatus());
         response.setBillingPeriodStart(bill.getBillingPeriodStart());
         response.setBillingPeriodEnd(bill.getBillingPeriodEnd());
+        response.setSourceMeterReadingId(bill.getSourceMeterReadingId());
+
+        if (bill.getTenantId() != null) {
+            tenantRepository.findById(bill.getTenantId())
+                    .ifPresent(tenant -> response.setTenant(toTenantSummary(tenant)));
+        }
+
+        RentalUnit unit = null;
+        if (bill.getRentalUnitId() != null) {
+            unit = rentalUnitRepository.findById(bill.getRentalUnitId()).orElse(null);
+            if (unit != null) {
+                response.setRentalUnit(toRentalUnitSummary(unit));
+            }
+        }
+
+        if (unit != null && unit.getPropertyId() != null) {
+            propertyRepository.findById(unit.getPropertyId())
+                    .ifPresent(property -> response.setProperty(toPropertySummary(property)));
+        }
+
         return response;
+    }
+
+    private TenantSummaryResponse toTenantSummary(Tenant tenant) {
+        TenantSummaryResponse summary = new TenantSummaryResponse();
+        summary.setId(tenant.getId());
+        summary.setFullName(tenant.getFullName());
+        summary.setPhoneNumber(tenant.getPhoneNumber());
+        summary.setEmail(tenant.getEmail());
+        return summary;
+    }
+
+    private RentalUnitSummaryResponse toRentalUnitSummary(RentalUnit unit) {
+        RentalUnitSummaryResponse summary = new RentalUnitSummaryResponse();
+        summary.setId(unit.getId());
+        summary.setUnitNumber(unit.getUnitNumber());
+        summary.setFloor(unit.getFloor());
+        summary.setRentAmount(unit.getRentAmount());
+        summary.setStatus(unit.getStatus());
+        return summary;
+    }
+
+    private PropertySummaryResponse toPropertySummary(Property property) {
+        PropertySummaryResponse summary = new PropertySummaryResponse();
+        summary.setId(property.getId());
+        summary.setTitle(property.getTitle());
+        summary.setPropertyType(property.getPropertyType());
+        summary.setRegistrationNumber(property.getRegistrationNumber());
+        return summary;
     }
 }

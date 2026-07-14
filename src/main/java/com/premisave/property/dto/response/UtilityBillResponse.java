@@ -19,4 +19,8 @@ public class UtilityBillResponse {
     private LocalDateTime billingPeriodStart;
     private LocalDateTime billingPeriodEnd;
     private String sourceMeterReadingId;
+
+    private TenantSummaryResponse tenant;
+    private RentalUnitSummaryResponse rentalUnit;
+    private PropertySummaryResponse property;
 }
