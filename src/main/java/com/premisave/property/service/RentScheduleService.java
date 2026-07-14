@@ -70,6 +70,45 @@ public class RentScheduleService {
         response.setAmountDue(schedule.getAmountDue());
         response.setAmountPaid(schedule.getAmountPaid());
         response.setStatus(schedule.getStatus());
+
+        applyPaymentSummary(response, schedule);
+
         return response;
+    }
+
+    /**
+     * Computes balanceDue / overpaidAmount / a human-readable paymentMessage
+     * from amountDue, amountPaid, and status — always accurate on any read,
+     * however many payments have landed on this schedule entry over time.
+     */
+    private void applyPaymentSummary(RentScheduleResponse response, RentSchedule schedule) {
+        BigDecimal amountDue = schedule.getAmountDue() != null ? schedule.getAmountDue() : BigDecimal.ZERO;
+        BigDecimal amountPaid = schedule.getAmountPaid() != null ? schedule.getAmountPaid() : BigDecimal.ZERO;
+        BigDecimal difference = amountPaid.subtract(amountDue); // positive = overpaid, negative = balance owed
+
+        BigDecimal balanceDue = difference.compareTo(BigDecimal.ZERO) < 0
+                ? difference.negate()
+                : BigDecimal.ZERO;
+        BigDecimal overpaidAmount = difference.compareTo(BigDecimal.ZERO) > 0
+                ? difference
+                : BigDecimal.ZERO;
+
+        response.setBalanceDue(balanceDue);
+        response.setOverpaidAmount(overpaidAmount);
+        response.setPaymentMessage(buildPaymentMessage(schedule.getStatus(), amountDue, balanceDue, overpaidAmount));
+    }
+
+    private String buildPaymentMessage(PaymentStatus status, BigDecimal amountDue,
+                                        BigDecimal balanceDue, BigDecimal overpaidAmount) {
+        return switch (status) {
+            case PAID -> "This rent period has been paid in full.";
+            case OVERPAID -> "This rent period was overpaid by KES " + overpaidAmount
+                    + ". Please contact your property owner regarding a credit or refund.";
+            case PARTIALLY_PAID -> "Partial payment received. KES " + balanceDue + " is still outstanding.";
+            case OVERDUE -> "This rent period is overdue. KES " + balanceDue + " is outstanding.";
+            case PENDING -> "No payment has been made yet. KES " + amountDue + " is due.";
+            case FAILED -> "The last payment attempt for this period failed. Please try again.";
+            case REFUNDED -> "This rent period's payment has been refunded.";
+        };
     }
 }

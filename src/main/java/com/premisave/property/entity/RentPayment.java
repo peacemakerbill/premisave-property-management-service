@@ -32,7 +32,13 @@ public class RentPayment {
     private String paymentReference;
 
     private PaymentStatus status = PaymentStatus.PENDING;
-    
+
+    // Human-readable snapshot of what this specific transaction did — e.g.
+    // flags an overpayment at the time it happened. Written once at record
+    // time in RentPaymentService; not recomputed later, since a schedule's
+    // live balance may change after this transaction (see
+    // RentScheduleResponse for the current, up-to-date balance instead).
+    private String description;
 
     private LocalDateTime dueDate;
     private LocalDateTime paidAt;

@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -94,6 +95,10 @@ public class RentPaymentService {
 
     @Transactional
     public RentPaymentResponse recordPayment(RentPaymentRequest request, String tenantId) {
+        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Payment amount must be greater than zero");
+        }
+
         Lease lease = findLeaseOrThrow(request.getLeaseId());
 
         boolean depositRequired;
@@ -134,6 +139,9 @@ public class RentPaymentService {
 
         BigDecimal rentApplied = BigDecimal.ZERO;
         PaymentStatus rentStatus = null;
+        LocalDate scheduleDueDate = null;
+        BigDecimal scheduleBalanceAfter = BigDecimal.ZERO;
+        BigDecimal scheduleOverpaidAfter = BigDecimal.ZERO;
 
         if (remaining.compareTo(BigDecimal.ZERO) > 0) {
             RentSchedule schedule = rentScheduleRepository
@@ -142,14 +150,26 @@ public class RentPaymentService {
                     .orElseThrow(() -> new ResourceNotFoundException("No outstanding rent due for this lease"));
 
             BigDecimal newAmountPaid = schedule.getAmountPaid().add(remaining);
+            int comparison = newAmountPaid.compareTo(schedule.getAmountDue());
+
+            PaymentStatus newScheduleStatus;
+            if (comparison == 0) {
+                newScheduleStatus = PaymentStatus.PAID;
+            } else if (comparison > 0) {
+                newScheduleStatus = PaymentStatus.OVERPAID;
+            } else {
+                newScheduleStatus = PaymentStatus.PARTIALLY_PAID;
+            }
+
             schedule.setAmountPaid(newAmountPaid);
-            schedule.setStatus(newAmountPaid.compareTo(schedule.getAmountDue()) >= 0
-                    ? PaymentStatus.PAID
-                    : PaymentStatus.PARTIALLY_PAID);
+            schedule.setStatus(newScheduleStatus);
             rentScheduleRepository.save(schedule);
 
             rentApplied = remaining;
-            rentStatus = schedule.getStatus();
+            rentStatus = newScheduleStatus;
+            scheduleDueDate = schedule.getDueDate();
+            scheduleBalanceAfter = comparison < 0 ? schedule.getAmountDue().subtract(newAmountPaid) : BigDecimal.ZERO;
+            scheduleOverpaidAfter = comparison > 0 ? newAmountPaid.subtract(schedule.getAmountDue()) : BigDecimal.ZERO;
         }
 
         RentPayment payment = new RentPayment();
@@ -159,10 +179,14 @@ public class RentPaymentService {
         payment.setAmountPaid(request.getAmount());
         payment.setDepositAmountApplied(depositApplied);
         payment.setRentAmountApplied(rentApplied);
-        payment.setPaymentType(resolvePaymentType(depositApplied, rentApplied));
+        PaymentType paymentType = resolvePaymentType(depositApplied, rentApplied);
+        payment.setPaymentType(paymentType);
         payment.setPaymentMethod(request.getPaymentMethod());
         payment.setStatus(rentStatus != null ? rentStatus : PaymentStatus.PAID);
         payment.setPaidAt(LocalDateTime.now());
+        payment.setDescription(buildPaymentDescription(
+                paymentType, depositApplied, rentApplied, rentStatus,
+                scheduleDueDate, scheduleBalanceAfter, scheduleOverpaidAfter));
 
         RentPayment saved = rentPaymentRepository.save(payment);
 
@@ -215,6 +239,41 @@ public class RentPaymentService {
         return PaymentType.RENT;
     }
 
+    /**
+     * Builds a plain-language, point-in-time summary of what this specific
+     * transaction did — including flagging an overpayment on the rent
+     * schedule entry it was applied to. This is a snapshot, written once;
+     * for the schedule's current live balance (which may have since changed
+     * due to later payments), see RentScheduleResponse instead.
+     */
+    private String buildPaymentDescription(PaymentType paymentType, BigDecimal depositApplied, BigDecimal rentApplied,
+                                            PaymentStatus rentStatus, LocalDate scheduleDueDate,
+                                            BigDecimal scheduleBalanceAfter, BigDecimal scheduleOverpaidAfter) {
+        StringBuilder message = new StringBuilder();
+
+        if (depositApplied.compareTo(BigDecimal.ZERO) > 0) {
+            message.append("KES ").append(depositApplied).append(" applied to your security deposit. ");
+        }
+
+        if (rentApplied.compareTo(BigDecimal.ZERO) > 0 && rentStatus != null) {
+            message.append(switch (rentStatus) {
+                case PAID -> "Rent payment of KES " + rentApplied + " received in full for the period due "
+                        + scheduleDueDate + ".";
+                case OVERPAID -> "Rent payment received with an overpayment of KES " + scheduleOverpaidAfter
+                        + " above the amount due for the period due " + scheduleDueDate
+                        + ". Please contact your property owner regarding a credit or refund.";
+                case PARTIALLY_PAID -> "Partial rent payment received. KES " + scheduleBalanceAfter
+                        + " is still outstanding for the period due " + scheduleDueDate + ".";
+                default -> "Rent payment of KES " + rentApplied + " recorded for the period due "
+                        + scheduleDueDate + ".";
+            });
+        } else if (paymentType == PaymentType.SECURITY_DEPOSIT) {
+            message.append("No outstanding rent was covered by this payment.");
+        }
+
+        return message.toString().trim();
+    }
+
     private Lease findLeaseOrThrow(String leaseId) {
         return leaseRepository.findById(leaseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lease not found"));
@@ -235,6 +294,7 @@ public class RentPaymentService {
         response.setStatus(payment.getStatus().name());
         response.setPaymentMethod(payment.getPaymentMethod());
         response.setPaidAt(payment.getPaidAt());
+        response.setDescription(payment.getDescription());
         return response;
     }
 }

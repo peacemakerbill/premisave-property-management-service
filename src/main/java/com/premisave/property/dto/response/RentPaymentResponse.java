@@ -17,4 +17,5 @@ public class RentPaymentResponse {
     private String status;
     private PaymentMethod paymentMethod;
     private LocalDateTime paidAt;
+    private String description;
 }

@@ -63,8 +63,13 @@ public class ReportService {
                 ? List.of()
                 : rentPaymentRepository.findByLeaseIdInAndPaidAtBetween(leaseIds, startDateTime, endDateTime);
 
+        // OVERPAID is included here because it represents real money already
+        // collected (in fact, more than what was strictly due) — it should
+        // never be excluded from actual revenue collected in this period.
         BigDecimal totalRevenue = payments.stream()
-                .filter(p -> p.getStatus() == PaymentStatus.PAID || p.getStatus() == PaymentStatus.PARTIALLY_PAID)
+                .filter(p -> p.getStatus() == PaymentStatus.PAID
+                        || p.getStatus() == PaymentStatus.PARTIALLY_PAID
+                        || p.getStatus() == PaymentStatus.OVERPAID)
                 .map(RentPayment::getAmountPaid)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
