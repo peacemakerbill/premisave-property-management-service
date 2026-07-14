@@ -20,6 +20,13 @@ public class UtilityBillResponse {
     private LocalDateTime billingPeriodEnd;
     private String sourceMeterReadingId;
 
+    // Derived, human-friendly payment info — computed at read time from
+    // amount/amountPaid/status so it's always accurate, not just right
+    // after a payment call.
+    private BigDecimal balanceDue;
+    private BigDecimal overpaidAmount;
+    private String paymentMessage;
+
     private TenantSummaryResponse tenant;
     private RentalUnitSummaryResponse rentalUnit;
     private PropertySummaryResponse property;

@@ -102,11 +102,28 @@ public class UtilityBillingService {
     public UtilityBillResponse payBill(PayUtilityBillRequest request) {
         UtilityBill bill = findOrThrow(request.getBillId());
 
+        if (bill.getStatus() == PaymentStatus.PAID || bill.getStatus() == PaymentStatus.OVERPAID) {
+            throw new ConflictException(
+                    "This bill has already been fully settled (" + bill.getStatus()
+                            + ") and cannot accept further payments");
+        }
+
+        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Payment amount must be greater than zero");
+        }
+
         BigDecimal newAmountPaid = bill.getAmountPaid().add(request.getAmount());
+        int comparison = newAmountPaid.compareTo(bill.getAmount());
+
+        if (comparison == 0) {
+            bill.setStatus(PaymentStatus.PAID);
+        } else if (comparison > 0) {
+            bill.setStatus(PaymentStatus.OVERPAID);
+        } else {
+            bill.setStatus(PaymentStatus.PARTIALLY_PAID);
+        }
+
         bill.setAmountPaid(newAmountPaid);
-        bill.setStatus(newAmountPaid.compareTo(bill.getAmount()) >= 0
-                ? PaymentStatus.PAID
-                : PaymentStatus.PARTIALLY_PAID);
 
         return toResponse(utilityBillRepository.save(bill));
     }
@@ -223,6 +240,8 @@ public class UtilityBillingService {
         response.setBillingPeriodEnd(bill.getBillingPeriodEnd());
         response.setSourceMeterReadingId(bill.getSourceMeterReadingId());
 
+        applyPaymentSummary(response, bill);
+
         if (bill.getTenantId() != null) {
             tenantRepository.findById(bill.getTenantId())
                     .ifPresent(tenant -> response.setTenant(toTenantSummary(tenant)));
@@ -242,6 +261,46 @@ public class UtilityBillingService {
         }
 
         return response;
+    }
+
+    /**
+     * Computes balanceDue / overpaidAmount / a human-readable paymentMessage
+     * from amount, amountPaid, and status — always accurate on any read,
+     * not just right after payBill() runs.
+     */
+    private void applyPaymentSummary(UtilityBillResponse response, UtilityBill bill) {
+        BigDecimal amount = bill.getAmount() != null ? bill.getAmount() : BigDecimal.ZERO;
+        BigDecimal amountPaid = bill.getAmountPaid() != null ? bill.getAmountPaid() : BigDecimal.ZERO;
+        BigDecimal difference = amountPaid.subtract(amount); // positive = overpaid, negative = balance owed
+
+        BigDecimal balanceDue = difference.compareTo(BigDecimal.ZERO) < 0
+                ? difference.negate()
+                : BigDecimal.ZERO;
+        BigDecimal overpaidAmount = difference.compareTo(BigDecimal.ZERO) > 0
+                ? difference
+                : BigDecimal.ZERO;
+
+        response.setBalanceDue(balanceDue);
+        response.setOverpaidAmount(overpaidAmount);
+        response.setPaymentMessage(buildPaymentMessage(bill.getStatus(), amount, amountPaid, balanceDue, overpaidAmount));
+    }
+
+    private String buildPaymentMessage(PaymentStatus status, BigDecimal amount, BigDecimal amountPaid,
+                                        BigDecimal balanceDue, BigDecimal overpaidAmount) {
+        return switch (status) {
+            case PAID -> "This bill has been paid in full. Thank you!";
+            case OVERPAID -> "Payment received in full, with an overpayment of KES " + overpaidAmount
+                    + " credited above the amount due. Please contact your property owner regarding a refund "
+                    + "or credit toward a future bill.";
+            case PARTIALLY_PAID -> "Partial payment received. KES " + balanceDue + " is still outstanding "
+                    + "out of KES " + amount + ".";
+            case OVERDUE -> "This bill is overdue. KES " + balanceDue + " is outstanding.";
+            case PENDING -> amountPaid.compareTo(BigDecimal.ZERO) > 0
+                    ? "Payment is being processed."
+                    : "No payment has been made yet. KES " + amount + " is due.";
+            case FAILED -> "The last payment attempt on this bill failed. Please try again.";
+            case REFUNDED -> "This bill has been refunded.";
+        };
     }
 
     private TenantSummaryResponse toTenantSummary(Tenant tenant) {
