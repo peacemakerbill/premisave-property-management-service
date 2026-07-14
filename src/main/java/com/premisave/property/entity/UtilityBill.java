@@ -25,7 +25,11 @@ public class UtilityBill {
 
     private LocalDateTime billingPeriodStart;
     private LocalDateTime billingPeriodEnd;
-    
+
+    // Set only when this bill was generated from a MeterReading.
+    // Enforces one bill per reading — see UtilityBillingService.generateBillFromReading().
+    private String sourceMeterReadingId;
+
     private PaymentStatus status = PaymentStatus.PENDING;
 
     @CreatedDate

@@ -18,4 +18,5 @@ public class UtilityBillResponse {
     private PaymentStatus status;
     private LocalDateTime billingPeriodStart;
     private LocalDateTime billingPeriodEnd;
+    private String sourceMeterReadingId;
 }

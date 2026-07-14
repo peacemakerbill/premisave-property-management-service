@@ -12,6 +12,7 @@ import com.premisave.property.enums.MeterType;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.UtilityType;
 import com.premisave.property.exception.BadRequestException;
+import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.MeterReadingRepository;
 import com.premisave.property.repository.OccupancyHistoryRepository;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -35,6 +37,9 @@ public class UtilityBillingService {
     @Transactional
     public UtilityBillResponse generateBill(UtilityBillRequest request) {
         String tenantId = resolveCurrentTenant(request.getRentalUnitId());
+
+        assertNoOverlappingBill(request.getRentalUnitId(), request.getUtilityType(),
+                request.getBillingPeriodStart(), request.getBillingPeriodEnd());
 
         UtilityBill bill = new UtilityBill();
         bill.setTenantId(tenantId);
@@ -51,6 +56,11 @@ public class UtilityBillingService {
 
     @Transactional
     public UtilityBillResponse generateBillFromReading(GenerateBillFromReadingRequest request) {
+        if (utilityBillRepository.existsBySourceMeterReadingId(request.getMeterReadingId())) {
+            throw new ConflictException(
+                    "A utility bill has already been generated from this meter reading");
+        }
+
         MeterReading reading = meterReadingRepository.findById(request.getMeterReadingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Meter reading not found"));
 
@@ -71,6 +81,7 @@ public class UtilityBillingService {
         bill.setAmountPaid(BigDecimal.ZERO);
         bill.setStatus(PaymentStatus.PENDING);
         bill.setBillingPeriodEnd(reading.getReadingDate());
+        bill.setSourceMeterReadingId(reading.getId());
 
         return toResponse(utilityBillRepository.save(bill));
     }
@@ -110,6 +121,44 @@ public class UtilityBillingService {
                 .map(this::toResponse)
                 .toList();
     }
+
+    // ------------------------------------------------------------------
+    // Duplicate-bill prevention
+    // ------------------------------------------------------------------
+
+    /**
+     * Rejects a manually-generated bill whose billing period overlaps an
+     * existing bill for the same unit and utility type. A missing start or
+     * end bound is treated as open-ended in that direction, so a bill with
+     * no period set (covers "everything") blocks any other bill for that
+     * unit/utility type until it's resolved.
+     */
+    private void assertNoOverlappingBill(String rentalUnitId, UtilityType utilityType,
+                                          LocalDateTime periodStart, LocalDateTime periodEnd) {
+        List<UtilityBill> existingBills =
+                utilityBillRepository.findByRentalUnitIdAndUtilityType(rentalUnitId, utilityType);
+
+        for (UtilityBill existing : existingBills) {
+            if (periodsOverlap(periodStart, periodEnd,
+                    existing.getBillingPeriodStart(), existing.getBillingPeriodEnd())) {
+                throw new ConflictException(
+                        "A " + utilityType + " bill already exists for this unit covering an overlapping "
+                                + "billing period (existing bill id: " + existing.getId() + ")");
+            }
+        }
+    }
+
+    private boolean periodsOverlap(LocalDateTime aStart, LocalDateTime aEnd,
+                                    LocalDateTime bStart, LocalDateTime bEnd) {
+        LocalDateTime aStartEff = aStart != null ? aStart : LocalDateTime.MIN;
+        LocalDateTime aEndEff = aEnd != null ? aEnd : LocalDateTime.MAX;
+        LocalDateTime bStartEff = bStart != null ? bStart : LocalDateTime.MIN;
+        LocalDateTime bEndEff = bEnd != null ? bEnd : LocalDateTime.MAX;
+
+        return !aEndEff.isBefore(bStartEff) && !bEndEff.isBefore(aStartEff);
+    }
+
+    // ------------------------------------------------------------------
 
     private String resolveCurrentTenant(String rentalUnitId) {
         return occupancyHistoryRepository.findByRentalUnitIdAndMoveOutDateIsNull(rentalUnitId)
