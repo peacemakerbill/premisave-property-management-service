@@ -1,21 +1,21 @@
 package com.premisave.property.service;
 
 import com.premisave.property.client.WalletServiceClient;
+import com.premisave.property.dto.request.LeaseRentPaymentRequest;
 import com.premisave.property.dto.request.RecordRentPaymentRequest;
-import com.premisave.property.dto.request.RentPaymentRequest;
 import com.premisave.property.dto.request.SecurityDepositRequest;
+import com.premisave.property.dto.response.LeaseRentPaymentResponse;
 import com.premisave.property.dto.response.PaymentDueResponse;
-import com.premisave.property.dto.response.RentPaymentResponse;
 import com.premisave.property.entity.Lease;
-import com.premisave.property.entity.RentPayment;
+import com.premisave.property.entity.LeaseRentPayment;
 import com.premisave.property.entity.RentSchedule;
 import com.premisave.property.entity.RentalUnit;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.PaymentType;
 import com.premisave.property.exception.BadRequestException;
 import com.premisave.property.exception.ResourceNotFoundException;
+import com.premisave.property.repository.LeaseRentPaymentRepository;
 import com.premisave.property.repository.LeaseRepository;
-import com.premisave.property.repository.RentPaymentRepository;
 import com.premisave.property.repository.RentScheduleRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.SecurityDepositRepository;
@@ -35,14 +35,14 @@ import java.util.Optional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RentPaymentService {
+public class LeaseRentPaymentService {
 
     // Safety cap on how many schedule entries a single payment can cascade
     // across (~2 years of monthly rent). Guards against a runaway loop if
     // schedule data is ever malformed (e.g. a zero-amount entry).
     private static final int MAX_SCHEDULES_TO_APPLY_PER_PAYMENT = 24;
 
-    private final RentPaymentRepository rentPaymentRepository;
+    private final LeaseRentPaymentRepository leaseRentPaymentRepository;
     private final RentScheduleRepository rentScheduleRepository;
     private final LeaseRepository leaseRepository;
     private final RentalUnitRepository rentalUnitRepository;
@@ -105,7 +105,7 @@ public class RentPaymentService {
     }
 
     @Transactional
-    public RentPaymentResponse recordPayment(RentPaymentRequest request, String tenantId) {
+    public LeaseRentPaymentResponse recordPayment(LeaseRentPaymentRequest request, String tenantId) {
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Payment amount must be greater than zero");
         }
@@ -150,7 +150,7 @@ public class RentPaymentService {
 
         RentApplicationResult rentResult = applyRentAcrossSchedules(request.getLeaseId(), remaining);
 
-        RentPayment payment = new RentPayment();
+        LeaseRentPayment payment = new LeaseRentPayment();
         payment.setLeaseId(request.getLeaseId());
         payment.setTenantId(tenantId);
         payment.setAmount(request.getAmount());
@@ -164,7 +164,7 @@ public class RentPaymentService {
         payment.setPaidAt(LocalDateTime.now());
         payment.setDescription(buildPaymentDescription(paymentType, depositApplied, rentResult));
 
-        RentPayment saved = rentPaymentRepository.save(payment);
+        LeaseRentPayment saved = leaseRentPaymentRepository.save(payment);
 
         // Record the payment in Wallet Service for the tenant's transaction
         // history. Deliberately NOT part of the DB transaction above — a
@@ -183,8 +183,8 @@ public class RentPaymentService {
         return toResponse(saved);
     }
 
-    public List<RentPaymentResponse> getPaymentHistory(String leaseId) {
-        return rentPaymentRepository.findByLeaseId(leaseId).stream()
+    public List<LeaseRentPaymentResponse> getPaymentHistory(String leaseId) {
+        return leaseRentPaymentRepository.findByLeaseId(leaseId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -288,11 +288,12 @@ public class RentPaymentService {
 
     /**
      * Best-effort call to Wallet Service. Failures are logged, not thrown —
-     * the RentPayment row saved above is the source of truth for the payment.
-     * TODO: once Wallet Service exposes a reconciliation/replay endpoint,
-     * failed attempts here should be queued for retry instead of only logged.
+     * the LeaseRentPayment row saved above is the source of truth for the
+     * payment. TODO: once Wallet Service exposes a reconciliation/replay
+     * endpoint, failed attempts here should be queued for retry instead of
+     * only logged.
      */
-    private void recordInWallet(RentPayment payment, String propertyId) {
+    private void recordInWallet(LeaseRentPayment payment, String propertyId) {
         try {
             RecordRentPaymentRequest walletRequest = RecordRentPaymentRequest.builder()
                     .tenantId(payment.getTenantId())
@@ -449,8 +450,8 @@ public class RentPaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Rental unit not found"));
     }
 
-    private RentPaymentResponse toResponse(RentPayment payment) {
-        RentPaymentResponse response = new RentPaymentResponse();
+    private LeaseRentPaymentResponse toResponse(LeaseRentPayment payment) {
+        LeaseRentPaymentResponse response = new LeaseRentPaymentResponse();
         response.setId(payment.getId());
         response.setPaymentType(payment.getPaymentType());
         response.setAmount(payment.getAmountPaid());

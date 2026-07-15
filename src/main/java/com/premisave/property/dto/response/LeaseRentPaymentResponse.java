@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
-public class RentPaymentResponse {
+public class LeaseRentPaymentResponse {
     private String id;
     private PaymentType paymentType;
     private BigDecimal amount;

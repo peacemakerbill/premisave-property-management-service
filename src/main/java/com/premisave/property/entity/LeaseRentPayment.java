@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Document(collection = "rent_payments")
-public class RentPayment {
+public class LeaseRentPayment {
 
     @Id
     private String id;
@@ -23,7 +23,7 @@ public class RentPayment {
 
     private BigDecimal amount;
     private BigDecimal amountPaid;
-    
+
     private PaymentType paymentType = PaymentType.RENT;
     private BigDecimal depositAmountApplied = BigDecimal.ZERO;
     private BigDecimal rentAmountApplied = BigDecimal.ZERO;
@@ -33,11 +33,8 @@ public class RentPayment {
 
     private PaymentStatus status = PaymentStatus.PENDING;
 
-    // Human-readable snapshot of what this specific transaction did — e.g.
-    // flags an overpayment at the time it happened. Written once at record
-    // time in RentPaymentService; not recomputed later, since a schedule's
-    // live balance may change after this transaction (see
-    // RentScheduleResponse for the current, up-to-date balance instead).
+    // Human-readable snapshot of what this specific transaction did —
+    // written once at record time in LeaseRentPaymentService.
     private String description;
 
     private LocalDateTime dueDate;

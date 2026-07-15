@@ -7,7 +7,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 @Data
-public class RentPaymentRequest {
+public class LeaseRentPaymentRequest {
 
     @NotNull
     private String leaseId;
