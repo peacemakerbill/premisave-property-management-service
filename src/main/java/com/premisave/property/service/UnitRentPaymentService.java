@@ -2,7 +2,7 @@ package com.premisave.property.service;
 
 import com.premisave.property.client.WalletServiceClient;
 import com.premisave.property.dto.request.RecordRentPaymentRequest;
-import com.premisave.property.dto.request.RentalUnitRentPaymentRequest;
+import com.premisave.property.dto.request.UnitRentPaymentRequest;
 import com.premisave.property.dto.response.UnitRentPaymentResponse;
 import com.premisave.property.entity.OccupancyHistory;
 import com.premisave.property.entity.RentBalance;
@@ -28,7 +28,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RentalUnitRentPaymentService {
+public class UnitRentPaymentService {
 
     private final RentalUnitRepository rentalUnitRepository;
     private final OccupancyHistoryRepository occupancyHistoryRepository;
@@ -40,7 +40,7 @@ public class RentalUnitRentPaymentService {
     private final SmsService smsService;
 
     @Transactional
-    public UnitRentPaymentResponse recordPayment(RentalUnitRentPaymentRequest request, String tenantId) {
+    public UnitRentPaymentResponse recordPayment(UnitRentPaymentRequest request, String tenantId) {
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Payment amount must be greater than zero");
         }
@@ -118,7 +118,7 @@ public class RentalUnitRentPaymentService {
     }
 
     /**
-     * Best-effort call to Wallet Service, mirroring RentPaymentService's
+     * Best-effort call to Wallet Service, mirroring LeaseRentPaymentService's
      * lease-based equivalent — failures are logged, never thrown.
      */
     private void recordInWallet(UnitRentPayment payment) {

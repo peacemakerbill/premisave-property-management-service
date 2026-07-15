@@ -8,7 +8,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 @Data
-public class RentalUnitRentPaymentRequest {
+public class UnitRentPaymentRequest {
 
     @NotBlank
     private String rentalUnitId;
