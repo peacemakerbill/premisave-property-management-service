@@ -26,4 +26,9 @@ public interface OccupancyHistoryRepository extends MongoRepository<OccupancyHis
 
     Optional<OccupancyHistory> findByPropertyIdAndOccupancyTypeAndMoveOutDateIsNull(
             String propertyId, OccupancyType occupancyType);
+
+    // All currently-active direct (no-lease) occupancies — used by
+    // RentBalanceService's monthly charge job so arrears accrue even if
+    // the tenant hasn't made a payment recently.
+    List<OccupancyHistory> findByLeaseIdIsNullAndMoveOutDateIsNull();
 }
