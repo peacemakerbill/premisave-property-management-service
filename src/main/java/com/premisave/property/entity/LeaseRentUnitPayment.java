@@ -12,8 +12,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
-@Document(collection = "rent_payments")
-public class LeaseRentPayment {
+@Document(collection = "lease_rent_unit_payments")
+public class LeaseRentUnitPayment {
 
     @Id
     private String id;
@@ -34,7 +34,7 @@ public class LeaseRentPayment {
     private PaymentStatus status = PaymentStatus.PENDING;
 
     // Human-readable snapshot of what this specific transaction did —
-    // written once at record time in LeaseRentPaymentService.
+    // written once at record time in LeaseRentUnitPaymentService.
     private String description;
 
     private LocalDateTime dueDate;

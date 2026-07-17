@@ -2,14 +2,14 @@ package com.premisave.property.service;
 
 import com.premisave.property.dto.response.DashboardSummaryResponse;
 import com.premisave.property.entity.Lease;
-import com.premisave.property.entity.LeaseRentPayment;
+import com.premisave.property.entity.LeaseRentUnitPayment;
 import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentalUnit;
 import com.premisave.property.enums.LeaseStatus;
 import com.premisave.property.enums.MaintenanceStatus;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.UnitStatus;
-import com.premisave.property.repository.LeaseRentPaymentRepository;
+import com.premisave.property.repository.LeaseRentUnitPaymentRepository;
 import com.premisave.property.repository.LeaseRepository;
 import com.premisave.property.repository.MaintenanceRequestRepository;
 import com.premisave.property.repository.PropertyRepository;
@@ -30,7 +30,7 @@ public class DashboardService {
     private final RentalUnitRepository rentalUnitRepository;
     private final LeaseRepository leaseRepository;
     private final MaintenanceRequestRepository maintenanceRepository;
-    private final LeaseRentPaymentRepository leaseRentPaymentRepository;
+    private final LeaseRentUnitPaymentRepository leaseRentUnitPaymentRepository;
 
     public DashboardSummaryResponse getOwnerDashboard(String ownerId) {
         List<String> propertyIds = propertyRepository.findByOwnerId(ownerId).stream()
@@ -90,7 +90,7 @@ public class DashboardService {
         LocalDateTime start = currentMonth.atDay(1).atStartOfDay();
         LocalDateTime end = currentMonth.plusMonths(1).atDay(1).atStartOfDay();
 
-        List<LeaseRentPayment> payments = leaseRentPaymentRepository
+        List<LeaseRentUnitPayment> payments = leaseRentUnitPaymentRepository
                 .findByLeaseIdInAndPaidAtBetween(leaseIds, start, end);
 
         // OVERPAID is included here because it represents real money already
@@ -100,7 +100,7 @@ public class DashboardService {
                 .filter(p -> p.getStatus() == PaymentStatus.PAID
                         || p.getStatus() == PaymentStatus.PARTIALLY_PAID
                         || p.getStatus() == PaymentStatus.OVERPAID)
-                .map(LeaseRentPayment::getAmountPaid)
+                .map(LeaseRentUnitPayment::getAmountPaid)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

@@ -3,12 +3,12 @@ package com.premisave.property.service;
 import com.premisave.property.dto.response.OccupancyReportResponse;
 import com.premisave.property.dto.response.RevenueReportResponse;
 import com.premisave.property.entity.Lease;
-import com.premisave.property.entity.LeaseRentPayment;
+import com.premisave.property.entity.LeaseRentUnitPayment;
 import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentalUnit;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.UnitStatus;
-import com.premisave.property.repository.LeaseRentPaymentRepository;
+import com.premisave.property.repository.LeaseRentUnitPaymentRepository;
 import com.premisave.property.repository.LeaseRepository;
 import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentalUnitRepository;
@@ -27,7 +27,7 @@ public class ReportService {
     private final PropertyRepository propertyRepository;
     private final RentalUnitRepository rentalUnitRepository;
     private final LeaseRepository leaseRepository;
-    private final LeaseRentPaymentRepository leaseRentPaymentRepository;
+    private final LeaseRentUnitPaymentRepository leaseRentUnitPaymentRepository;
 
     public OccupancyReportResponse getOccupancyReport(String ownerId) {
         List<RentalUnit> units = getOwnerUnits(ownerId);
@@ -59,9 +59,9 @@ public class ReportService {
                         .map(Lease::getId)
                         .toList();
 
-        List<LeaseRentPayment> payments = leaseIds.isEmpty()
+        List<LeaseRentUnitPayment> payments = leaseIds.isEmpty()
                 ? List.of()
-                : leaseRentPaymentRepository.findByLeaseIdInAndPaidAtBetween(leaseIds, startDateTime, endDateTime);
+                : leaseRentUnitPaymentRepository.findByLeaseIdInAndPaidAtBetween(leaseIds, startDateTime, endDateTime);
 
         // OVERPAID is included here because it represents real money already
         // collected (in fact, more than what was strictly due) — it should
@@ -70,7 +70,7 @@ public class ReportService {
                 .filter(p -> p.getStatus() == PaymentStatus.PAID
                         || p.getStatus() == PaymentStatus.PARTIALLY_PAID
                         || p.getStatus() == PaymentStatus.OVERPAID)
-                .map(LeaseRentPayment::getAmountPaid)
+                .map(LeaseRentUnitPayment::getAmountPaid)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         RevenueReportResponse response = new RevenueReportResponse();
