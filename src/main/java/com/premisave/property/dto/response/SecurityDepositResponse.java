@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 public class SecurityDepositResponse {
     private String id;
     private String leaseId;
+    private String rentalUnitId;
     private String tenantId;
     private BigDecimal amount;
     private BigDecimal refundedAmount;

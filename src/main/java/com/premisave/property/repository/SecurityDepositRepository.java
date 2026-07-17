@@ -12,5 +12,7 @@ public interface SecurityDepositRepository extends MongoRepository<SecurityDepos
 
     Optional<SecurityDeposit> findByLeaseId(String leaseId);
 
+    Optional<SecurityDeposit> findByRentalUnitIdAndTenantId(String rentalUnitId, String tenantId);
+
     List<SecurityDeposit> findByTenantId(String tenantId);
 }

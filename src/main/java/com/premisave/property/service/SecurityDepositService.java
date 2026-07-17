@@ -27,6 +27,17 @@ public class SecurityDepositService {
 
     @Transactional
     public SecurityDepositResponse holdDeposit(SecurityDepositRequest request) {
+        boolean hasLease = request.getLeaseId() != null && !request.getLeaseId().isBlank();
+        boolean hasUnit = request.getRentalUnitId() != null && !request.getRentalUnitId().isBlank();
+
+        if (hasLease == hasUnit) {
+            throw new BadRequestException("Provide exactly one of leaseId or rentalUnitId");
+        }
+
+        return hasLease ? holdLeaseDeposit(request) : holdUnitDeposit(request);
+    }
+
+    private SecurityDepositResponse holdLeaseDeposit(SecurityDepositRequest request) {
         depositRepository.findByLeaseId(request.getLeaseId()).ifPresent(existing -> {
             throw new ConflictException("A security deposit already exists for this lease");
         });
@@ -44,10 +55,42 @@ public class SecurityDepositService {
         return toResponse(depositRepository.save(deposit));
     }
 
+    private SecurityDepositResponse holdUnitDeposit(SecurityDepositRequest request) {
+        if (request.getTenantId() == null || request.getTenantId().isBlank()) {
+            throw new BadRequestException(
+                    "tenantId is required when holding a deposit against a rentalUnitId");
+        }
+
+        depositRepository.findByRentalUnitIdAndTenantId(request.getRentalUnitId(), request.getTenantId())
+                .ifPresent(existing -> {
+                    throw new ConflictException("A security deposit already exists for this tenant on this unit");
+                });
+
+        SecurityDeposit deposit = new SecurityDeposit();
+        deposit.setRentalUnitId(request.getRentalUnitId());
+        deposit.setTenantId(request.getTenantId());
+        deposit.setAmount(request.getAmount());
+        deposit.setRefundedAmount(BigDecimal.ZERO);
+        deposit.setStatus(DepositStatus.HELD);
+
+        return toResponse(depositRepository.save(deposit));
+    }
+
     @Transactional
     public SecurityDepositResponse refundDeposit(RefundDepositRequest request) {
-        SecurityDeposit deposit = depositRepository.findByLeaseId(request.getLeaseId())
-                .orElseThrow(() -> new ResourceNotFoundException("No security deposit found for this lease"));
+        boolean hasLease = request.getLeaseId() != null && !request.getLeaseId().isBlank();
+        boolean hasUnit = request.getRentalUnitId() != null && !request.getRentalUnitId().isBlank();
+
+        if (hasLease == hasUnit) {
+            throw new BadRequestException("Provide exactly one of leaseId or rentalUnitId");
+        }
+
+        SecurityDeposit deposit = hasLease
+                ? depositRepository.findByLeaseId(request.getLeaseId())
+                        .orElseThrow(() -> new ResourceNotFoundException("No security deposit found for this lease"))
+                : depositRepository.findByRentalUnitIdAndTenantId(request.getRentalUnitId(), requireTenantId(request))
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "No security deposit found for this tenant on this unit"));
 
         if (deposit.getStatus() == DepositStatus.REFUNDED) {
             throw new ConflictException("This deposit has already been fully refunded");
@@ -71,10 +114,25 @@ public class SecurityDepositService {
                 .orElseThrow(() -> new ResourceNotFoundException("No security deposit found for this lease"));
     }
 
+    public SecurityDepositResponse getDepositByUnit(String rentalUnitId, String tenantId) {
+        return depositRepository.findByRentalUnitIdAndTenantId(rentalUnitId, tenantId)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No security deposit found for this tenant on this unit"));
+    }
+
+    private String requireTenantId(RefundDepositRequest request) {
+        if (request.getTenantId() == null || request.getTenantId().isBlank()) {
+            throw new BadRequestException("tenantId is required when refunding a deposit for a rentalUnitId");
+        }
+        return request.getTenantId();
+    }
+
     private SecurityDepositResponse toResponse(SecurityDeposit deposit) {
         SecurityDepositResponse response = new SecurityDepositResponse();
         response.setId(deposit.getId());
         response.setLeaseId(deposit.getLeaseId());
+        response.setRentalUnitId(deposit.getRentalUnitId());
         response.setTenantId(deposit.getTenantId());
         response.setAmount(deposit.getAmount());
         response.setRefundedAmount(deposit.getRefundedAmount());

@@ -16,7 +16,8 @@ public class SecurityDeposit {
     @Id
     private String id;
 
-    private String leaseId;
+    private String leaseId;        // set for lease-backed deposits
+    private String rentalUnitId;   // set for direct (no-lease) unit deposits
     private String tenantId;
 
     private BigDecimal amount;

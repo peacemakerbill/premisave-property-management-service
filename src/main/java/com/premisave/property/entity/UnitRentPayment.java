@@ -2,6 +2,7 @@ package com.premisave.property.entity;
 
 import com.premisave.property.enums.PaymentMethod;
 import com.premisave.property.enums.PaymentStatus;
+import com.premisave.property.enums.PaymentType;
 import lombok.Data;
 import org.springframework.data.annotation.*;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -11,9 +12,9 @@ import java.time.LocalDateTime;
 
 /**
  * A rent payment transaction against a directly-occupied (no-lease) rental
- * unit. Mirrors RentPayment's role for leases, but scoped to rentalUnitId
- * instead of leaseId, and carries the resulting RentBalance snapshot at the
- * time of payment.
+ * unit. Mirrors LeaseRentUnitPayment's role for leases, but scoped to
+ * rentalUnitId instead of leaseId, and carries the resulting RentBalance
+ * snapshot at the time of payment.
  */
 @Data
 @Document(collection = "unit_rent_payments")
@@ -28,6 +29,10 @@ public class UnitRentPayment {
 
     private BigDecimal amount;
     private PaymentMethod paymentMethod;
+
+    private PaymentType paymentType = PaymentType.RENT;
+    private BigDecimal depositAmountApplied = BigDecimal.ZERO;
+    private BigDecimal rentAmountApplied = BigDecimal.ZERO;
 
     private PaymentStatus status; // PAID / PARTIALLY_PAID / OVERPAID
 

@@ -1,6 +1,7 @@
 package com.premisave.property.controller;
 
 import com.premisave.property.dto.request.UnitRentPaymentRequest;
+import com.premisave.property.dto.response.PaymentDueResponse;
 import com.premisave.property.dto.response.UnitRentPaymentResponse;
 import com.premisave.property.service.TenantService;
 import com.premisave.property.service.UnitRentPaymentService;
@@ -21,6 +22,19 @@ public class UnitRentController {
 
     private final UnitRentPaymentService unitRentPaymentService;
     private final TenantService tenantService;
+
+    @GetMapping("/due/{rentalUnitId}")
+    public ResponseEntity<PaymentDueResponse> getMyPaymentDue(@PathVariable String rentalUnitId,
+                                                               HttpServletRequest httpRequest) {
+        String tenantId = resolveTenantId(httpRequest);
+        return ResponseEntity.ok(unitRentPaymentService.getPaymentDue(rentalUnitId, tenantId));
+    }
+
+    @GetMapping("/due/{rentalUnitId}/tenant/{tenantId}")
+    public ResponseEntity<PaymentDueResponse> getPaymentDueForTenant(@PathVariable String rentalUnitId,
+                                                                      @PathVariable String tenantId) {
+        return ResponseEntity.ok(unitRentPaymentService.getPaymentDue(rentalUnitId, tenantId));
+    }
 
     @PostMapping("/pay")
     public ResponseEntity<UnitRentPaymentResponse> payUnitRent(@Valid @RequestBody UnitRentPaymentRequest request,

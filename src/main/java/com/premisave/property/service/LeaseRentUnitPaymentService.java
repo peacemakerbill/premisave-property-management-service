@@ -160,7 +160,7 @@ public class LeaseRentUnitPaymentService {
         PaymentType paymentType = resolvePaymentType(depositApplied, rentResult.totalRentApplied());
         payment.setPaymentType(paymentType);
         payment.setPaymentMethod(request.getPaymentMethod());
-        payment.setStatus(rentResult.finalStatus() != null ? rentResult.finalStatus() : PaymentStatus.PAID);
+        payment.setStatus(deriveTransactionStatus(rentResult));
         payment.setPaidAt(LocalDateTime.now());
         payment.setDescription(buildPaymentDescription(paymentType, depositApplied, rentResult));
 
@@ -374,6 +374,30 @@ public class LeaseRentUnitPaymentService {
         if (hasDeposit) return PaymentType.SECURITY_DEPOSIT;
         return PaymentType.RENT;
     }
+    
+    /**
+     * The transaction-level outcome, as the payer experienced it — distinct
+     * from the status of whichever schedule entry the loop happened to
+     * finish on. If the payment touched more than one schedule entry, it
+     * necessarily paid more than what was strictly due at the time (the
+     * excess spilled forward, or was held as a credit) — that's an
+     * OVERPAID transaction from the payer's point of view, even if the
+     * final period it reached only ended up partially covered. Only a
+     * payment that touched exactly one entry and fell short of it is a
+     * genuine PARTIALLY_PAID transaction.
+     */
+    private PaymentStatus deriveTransactionStatus(RentApplicationResult rentResult) {
+        List<ScheduleApplication> applications = rentResult.applications();
+
+        if (applications.isEmpty()) {
+            return PaymentStatus.PAID; // pure deposit payment, no rent portion
+        }
+        if (applications.size() > 1) {
+            return PaymentStatus.OVERPAID;
+        }
+        return rentResult.finalStatus();
+    }
+    
 
     /**
      * Builds a plain-language, point-in-time summary of what this specific
