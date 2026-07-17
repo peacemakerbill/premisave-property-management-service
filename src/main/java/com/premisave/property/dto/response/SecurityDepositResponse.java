@@ -22,4 +22,13 @@ public class SecurityDepositResponse {
     private DepositStatus status;
     private LocalDateTime refundedAt;
     private List<DepositRefundEntryResponse> refundHistory;
+
+    // Enriched context so the frontend can render a full picture without
+    // extra round-trips. lease is only populated for lease-backed deposits;
+    // unit is populated whenever a rental unit is involved (either directly,
+    // or via the lease).
+    private TenantSummaryResponse tenant;
+    private LeaseSummaryResponse lease;
+    private PropertySummaryResponse property;
+    private RentalUnitSummaryResponse unit;
 }
