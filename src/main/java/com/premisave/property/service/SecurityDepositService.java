@@ -25,7 +25,6 @@ import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.SecurityDepositRepository;
 import com.premisave.property.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,8 +32,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SecurityDepositService {
@@ -44,8 +43,6 @@ public class SecurityDepositService {
     private final TenantRepository tenantRepository;
     private final PropertyRepository propertyRepository;
     private final RentalUnitRepository rentalUnitRepository;
-    private final EmailService emailService;
-    private final SmsService smsService;
 
     @Transactional
     public SecurityDepositResponse holdDeposit(SecurityDepositRequest request) {
@@ -56,12 +53,10 @@ public class SecurityDepositService {
             throw new BadRequestException("Provide exactly one of leaseId or rentalUnitId");
         }
 
-        SecurityDeposit saved = hasLease ? holdLeaseDeposit(request) : holdUnitDeposit(request);
-        notifyDepositHeld(saved);
-        return toResponse(saved);
+        return hasLease ? holdLeaseDeposit(request) : holdUnitDeposit(request);
     }
 
-    private SecurityDeposit holdLeaseDeposit(SecurityDepositRequest request) {
+    private SecurityDepositResponse holdLeaseDeposit(SecurityDepositRequest request) {
         depositRepository.findByLeaseId(request.getLeaseId()).ifPresent(existing -> {
             throw new ConflictException("A security deposit already exists for this lease");
         });
@@ -76,18 +71,23 @@ public class SecurityDepositService {
         deposit.setRefundedAmount(BigDecimal.ZERO);
         deposit.setStatus(DepositStatus.HELD);
 
-        return depositRepository.save(deposit);
+        return toResponse(depositRepository.save(deposit));
     }
 
-    private SecurityDeposit holdUnitDeposit(SecurityDepositRequest request) {
+    private SecurityDepositResponse holdUnitDeposit(SecurityDepositRequest request) {
         if (request.getTenantId() == null || request.getTenantId().isBlank()) {
             throw new BadRequestException(
                     "tenantId is required when holding a deposit against a rentalUnitId");
         }
 
-        depositRepository.findByRentalUnitIdAndTenantId(request.getRentalUnitId(), request.getTenantId())
+        // Only an unresolved (not-yet-fully-refunded) deposit blocks a new
+        // hold. A fully REFUNDED deposit is a closed-out record from a past
+        // tenancy period and should never prevent the same tenant from
+        // returning to the same unit later and starting a new one.
+        findActiveUnitDeposit(request.getRentalUnitId(), request.getTenantId())
                 .ifPresent(existing -> {
-                    throw new ConflictException("A security deposit already exists for this tenant on this unit");
+                    throw new ConflictException(
+                            "This tenant already has an active security deposit on this unit");
                 });
 
         SecurityDeposit deposit = new SecurityDeposit();
@@ -97,7 +97,7 @@ public class SecurityDepositService {
         deposit.setRefundedAmount(BigDecimal.ZERO);
         deposit.setStatus(DepositStatus.HELD);
 
-        return depositRepository.save(deposit);
+        return toResponse(depositRepository.save(deposit));
     }
 
     /**
@@ -106,8 +106,7 @@ public class SecurityDepositService {
      * every refund issued so far can never exceed the original deposit
      * amount. A reason is required whenever the refund is partial (i.e.
      * doesn't bring the balance to zero); it's optional on a final refund
-     * that fully closes the deposit out. Fires a best-effort email + SMS to
-     * the tenant once the refund is recorded.
+     * that fully closes the deposit out.
      */
     @Transactional
     public SecurityDepositResponse refundDeposit(RefundDepositRequest request) {
@@ -121,9 +120,9 @@ public class SecurityDepositService {
         SecurityDeposit deposit = hasLease
                 ? depositRepository.findByLeaseId(request.getLeaseId())
                         .orElseThrow(() -> new ResourceNotFoundException("No security deposit found for this lease"))
-                : depositRepository.findByRentalUnitIdAndTenantId(request.getRentalUnitId(), requireTenantId(request))
+                : findActiveUnitDeposit(request.getRentalUnitId(), requireTenantId(request))
                         .orElseThrow(() -> new ResourceNotFoundException(
-                                "No security deposit found for this tenant on this unit"));
+                                "No active security deposit found for this tenant on this unit"));
 
         if (deposit.getStatus() == DepositStatus.REFUNDED) {
             throw new ConflictException("This deposit has already been fully refunded");
@@ -166,12 +165,7 @@ public class SecurityDepositService {
         deposit.setRefundedAt(entry.getRefundedAt());
         deposit.setStatus(isFinalRefund ? DepositStatus.REFUNDED : DepositStatus.PARTIALLY_REFUNDED);
 
-        SecurityDeposit saved = depositRepository.save(deposit);
-
-        BigDecimal newRemaining = saved.getAmount().subtract(newRefundedTotal);
-        notifyRefund(saved, requestedAmount, entry.getReason(), isFinalRefund, newRemaining);
-
-        return toResponse(saved);
+        return toResponse(depositRepository.save(deposit));
     }
 
     /**
@@ -193,9 +187,9 @@ public class SecurityDepositService {
         SecurityDeposit deposit = hasLease
                 ? depositRepository.findByLeaseId(leaseId)
                         .orElseThrow(() -> new ResourceNotFoundException("No security deposit found for this lease"))
-                : depositRepository.findByRentalUnitIdAndTenantId(rentalUnitId, requireTenantId(tenantId))
+                : findActiveUnitDeposit(rentalUnitId, requireTenantId(tenantId))
                         .orElseThrow(() -> new ResourceNotFoundException(
-                                "No security deposit found for this tenant on this unit"));
+                                "No active security deposit found for this tenant on this unit"));
 
         BigDecimal alreadyRefunded = deposit.getRefundedAmount() != null
                 ? deposit.getRefundedAmount()
@@ -257,11 +251,43 @@ public class SecurityDepositService {
                 .orElseThrow(() -> new ResourceNotFoundException("No security deposit found for this lease"));
     }
 
+    // Returns the most recent deposit for this unit+tenant pair regardless
+    // of status — so a tenant/owner can still view a past tenancy's
+    // deposit (and its refund history) even after it's been fully
+    // refunded and closed out, rather than getting a 404.
     public SecurityDepositResponse getDepositByUnit(String rentalUnitId, String tenantId) {
-        return depositRepository.findByRentalUnitIdAndTenantId(rentalUnitId, tenantId)
+        return findLatestUnitDeposit(rentalUnitId, tenantId)
                 .map(this::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No security deposit found for this tenant on this unit"));
+    }
+
+    // Whether this tenant currently has an unresolved deposit on this unit —
+    // i.e. one from their CURRENT tenancy, not a fully REFUNDED one left
+    // over from a past stay. Used by UnitRentPaymentService to decide
+    // whether a new deposit charge is still owed.
+    public boolean hasActiveDeposit(String rentalUnitId, String tenantId) {
+        return findActiveUnitDeposit(rentalUnitId, tenantId).isPresent();
+    }
+
+    // ------------------------------------------------------------------
+    // Direct-unit deposit lookups — a tenant can have more than one
+    // SecurityDeposit document over time for the same unit (one per
+    // tenancy period), so these centralize how "the deposit that matters
+    // right now" vs. "the most recent one overall" gets picked.
+    // ------------------------------------------------------------------
+
+    private Optional<SecurityDeposit> findActiveUnitDeposit(String rentalUnitId, String tenantId) {
+        return depositRepository.findByRentalUnitIdAndTenantIdOrderByCreatedAtDesc(rentalUnitId, tenantId)
+                .stream()
+                .filter(d -> d.getStatus() != DepositStatus.REFUNDED)
+                .findFirst();
+    }
+
+    private Optional<SecurityDeposit> findLatestUnitDeposit(String rentalUnitId, String tenantId) {
+        return depositRepository.findByRentalUnitIdAndTenantIdOrderByCreatedAtDesc(rentalUnitId, tenantId)
+                .stream()
+                .findFirst();
     }
 
     private String requireTenantId(String tenantId) {
@@ -273,65 +299,6 @@ public class SecurityDepositService {
 
     private String requireTenantId(RefundDepositRequest request) {
         return requireTenantId(request.getTenantId());
-    }
-
-    // ------------------------------------------------------------------
-    // Notifications — best-effort, mirrors EmailService/SmsService's own
-    // contract: never allowed to throw or block the deposit/refund that
-    // already committed successfully. Skipped silently if the tenant
-    // can't be resolved; each service already skips on its own if the
-    // tenant has no email/phone on file.
-    // ------------------------------------------------------------------
-
-    private void notifyDepositHeld(SecurityDeposit deposit) {
-        Tenant tenant = tenantRepository.findById(deposit.getTenantId()).orElse(null);
-        if (tenant == null) {
-            log.warn("Skipping deposit-held notification — tenant {} not found", deposit.getTenantId());
-            return;
-        }
-
-        String subject = "Security Deposit Received";
-        String content = "We've recorded and held your security deposit of KES " + deposit.getAmount()
-                + ". This will be refunded (in full or in part) when your tenancy ends, subject to the "
-                + "condition of the property.";
-        String smsMessage = "Premisave: Your security deposit of KES " + deposit.getAmount()
-                + " has been recorded and held.";
-
-        emailService.sendNoticeEmail(tenant.getEmail(), tenant.getFullName(), subject,
-                "SECURITY_DEPOSIT_HELD", content);
-        smsService.sendNoticeSms(tenant.getPhoneNumber(), smsMessage);
-    }
-
-    private void notifyRefund(SecurityDeposit deposit, BigDecimal refundedNow, String reason,
-                               boolean isFinalRefund, BigDecimal remaining) {
-        Tenant tenant = tenantRepository.findById(deposit.getTenantId()).orElse(null);
-        if (tenant == null) {
-            log.warn("Skipping refund notification — tenant {} not found", deposit.getTenantId());
-            return;
-        }
-
-        String subject = isFinalRefund ? "Security Deposit Fully Refunded" : "Security Deposit Partially Refunded";
-
-        StringBuilder content = new StringBuilder("A refund of KES ").append(refundedNow)
-                .append(" has been issued against your security deposit.");
-        if (reason != null && !reason.isBlank()) {
-            content.append(" Reason: ").append(reason).append(".");
-        }
-        if (isFinalRefund) {
-            content.append(" Your deposit has now been fully refunded.");
-        } else {
-            content.append(" Remaining balance still held: KES ").append(remaining).append(".");
-        }
-
-        StringBuilder smsMessage = new StringBuilder("Premisave: KES ").append(refundedNow)
-                .append(isFinalRefund ? " refunded — deposit fully settled." : " refunded from your deposit.");
-        if (!isFinalRefund) {
-            smsMessage.append(" Remaining: KES ").append(remaining).append(".");
-        }
-
-        emailService.sendNoticeEmail(tenant.getEmail(), tenant.getFullName(), subject.toString(),
-                "SECURITY_DEPOSIT_REFUND", content.toString());
-        smsService.sendNoticeSms(tenant.getPhoneNumber(), smsMessage.toString());
     }
 
     // ------------------------------------------------------------------

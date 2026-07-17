@@ -12,7 +12,11 @@ public interface SecurityDepositRepository extends MongoRepository<SecurityDepos
 
     Optional<SecurityDeposit> findByLeaseId(String leaseId);
 
-    Optional<SecurityDeposit> findByRentalUnitIdAndTenantId(String rentalUnitId, String tenantId);
+    // A tenant can occupy the same unit across multiple, non-overlapping
+    // tenancy periods over time (leave, then return months/years later) —
+    // so this is no longer a single Optional. Ordered newest-first so the
+    // most recent tenancy period is always first in the list.
+    List<SecurityDeposit> findByRentalUnitIdAndTenantIdOrderByCreatedAtDesc(String rentalUnitId, String tenantId);
 
     List<SecurityDeposit> findByTenantId(String tenantId);
 }

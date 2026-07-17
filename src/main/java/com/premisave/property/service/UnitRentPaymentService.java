@@ -22,7 +22,6 @@ import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.OccupancyHistoryRepository;
 import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentalUnitRepository;
-import com.premisave.property.repository.SecurityDepositRepository;
 import com.premisave.property.repository.TenantRepository;
 import com.premisave.property.repository.UnitRentPaymentRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +44,6 @@ public class UnitRentPaymentService {
     private final TenantRepository tenantRepository;
     private final PropertyRepository propertyRepository;
     private final RentBalanceService rentBalanceService;
-    private final SecurityDepositRepository securityDepositRepository;
     private final SecurityDepositService securityDepositService;
     private final WalletServiceClient walletServiceClient;
     private final EmailService emailService;
@@ -66,7 +64,6 @@ public class UnitRentPaymentService {
                                    TenantRepository tenantRepository,
                                    PropertyRepository propertyRepository,
                                    RentBalanceService rentBalanceService,
-                                   SecurityDepositRepository securityDepositRepository,
                                    SecurityDepositService securityDepositService,
                                    WalletServiceClient walletServiceClient,
                                    EmailService emailService,
@@ -78,7 +75,6 @@ public class UnitRentPaymentService {
         this.tenantRepository = tenantRepository;
         this.propertyRepository = propertyRepository;
         this.rentBalanceService = rentBalanceService;
-        this.securityDepositRepository = securityDepositRepository;
         this.securityDepositService = securityDepositService;
         this.walletServiceClient = walletServiceClient;
         this.emailService = emailService;
@@ -92,8 +88,7 @@ public class UnitRentPaymentService {
 
         boolean depositRequired = Boolean.TRUE.equals(unit.getDepositRequired());
         BigDecimal depositAmount = unit.getSecurityDeposit();
-        boolean depositHeld = securityDepositRepository
-                .findByRentalUnitIdAndTenantId(rentalUnitId, tenantId).isPresent();
+        boolean depositHeld = securityDepositService.hasActiveDeposit(rentalUnitId, tenantId);
         BigDecimal depositDue = (depositRequired && !depositHeld && depositAmount != null)
                 ? depositAmount
                 : BigDecimal.ZERO;
@@ -134,8 +129,7 @@ public class UnitRentPaymentService {
 
         boolean depositRequired = Boolean.TRUE.equals(unit.getDepositRequired());
         BigDecimal depositAmount = unit.getSecurityDeposit();
-        boolean depositAlreadyHeld = securityDepositRepository
-                .findByRentalUnitIdAndTenantId(unit.getId(), tenantId).isPresent();
+        boolean depositAlreadyHeld = securityDepositService.hasActiveDeposit(unit.getId(), tenantId);
 
         BigDecimal remaining = request.getAmount();
         BigDecimal depositApplied = BigDecimal.ZERO;
