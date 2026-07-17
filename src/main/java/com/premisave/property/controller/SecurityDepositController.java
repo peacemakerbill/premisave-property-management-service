@@ -2,6 +2,7 @@ package com.premisave.property.controller;
 
 import com.premisave.property.dto.request.RefundDepositRequest;
 import com.premisave.property.dto.request.SecurityDepositRequest;
+import com.premisave.property.dto.response.RefundCheckResponse;
 import com.premisave.property.dto.response.SecurityDepositResponse;
 import com.premisave.property.service.SecurityDepositService;
 import com.premisave.property.service.TenantService;
@@ -10,6 +11,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/v1/security-deposits")
@@ -27,6 +30,19 @@ public class SecurityDepositController {
     @PostMapping("/refund")
     public ResponseEntity<SecurityDepositResponse> refundDeposit(@Valid @RequestBody RefundDepositRequest request) {
         return ResponseEntity.ok(securityDepositService.refundDeposit(request));
+    }
+
+    @GetMapping("/lease/{leaseId}/refund-check")
+    public ResponseEntity<RefundCheckResponse> checkLeaseRefund(@PathVariable String leaseId,
+                                                                  @RequestParam BigDecimal amount) {
+        return ResponseEntity.ok(securityDepositService.checkRefund(leaseId, null, null, amount));
+    }
+
+    @GetMapping("/unit/{rentalUnitId}/tenant/{tenantId}/refund-check")
+    public ResponseEntity<RefundCheckResponse> checkUnitRefund(@PathVariable String rentalUnitId,
+                                                                 @PathVariable String tenantId,
+                                                                 @RequestParam BigDecimal amount) {
+        return ResponseEntity.ok(securityDepositService.checkRefund(null, rentalUnitId, tenantId, amount));
     }
 
     @GetMapping("/lease/{leaseId}")
