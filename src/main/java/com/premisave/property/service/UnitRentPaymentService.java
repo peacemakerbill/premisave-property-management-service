@@ -3,8 +3,12 @@ package com.premisave.property.service;
 import com.premisave.property.client.WalletServiceClient;
 import com.premisave.property.dto.request.RecordRentPaymentRequest;
 import com.premisave.property.dto.request.UnitRentPaymentRequest;
+import com.premisave.property.dto.response.PropertySummaryResponse;
+import com.premisave.property.dto.response.RentalUnitSummaryResponse;
+import com.premisave.property.dto.response.TenantSummaryResponse;
 import com.premisave.property.dto.response.UnitRentPaymentResponse;
 import com.premisave.property.entity.OccupancyHistory;
+import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentBalance;
 import com.premisave.property.entity.RentalUnit;
 import com.premisave.property.entity.Tenant;
@@ -13,31 +17,64 @@ import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.exception.BadRequestException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.OccupancyHistoryRepository;
+import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.TenantRepository;
 import com.premisave.property.repository.UnitRentPaymentRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class UnitRentPaymentService {
 
     private final RentalUnitRepository rentalUnitRepository;
     private final OccupancyHistoryRepository occupancyHistoryRepository;
     private final UnitRentPaymentRepository unitRentPaymentRepository;
     private final TenantRepository tenantRepository;
+    private final PropertyRepository propertyRepository;
     private final RentBalanceService rentBalanceService;
     private final WalletServiceClient walletServiceClient;
     private final EmailService emailService;
     private final SmsService smsService;
+
+    // Post-payment side effects (wallet-service call, overpayment
+    // notification — which includes a synchronous SMTP send via
+    // EmailService) run here instead of on the request thread. SMTP
+    // round-trips are the slowest part of this request by far; moving
+    // them off-thread is what makes /api/v1/rent/units/pay fast. Reuses
+    // the project's existing "taskExecutor" bean (see AsyncConfig) rather
+    // than introducing a second thread pool.
+    private final Executor taskExecutor;
+
+    public UnitRentPaymentService(RentalUnitRepository rentalUnitRepository,
+                                   OccupancyHistoryRepository occupancyHistoryRepository,
+                                   UnitRentPaymentRepository unitRentPaymentRepository,
+                                   TenantRepository tenantRepository,
+                                   PropertyRepository propertyRepository,
+                                   RentBalanceService rentBalanceService,
+                                   WalletServiceClient walletServiceClient,
+                                   EmailService emailService,
+                                   SmsService smsService,
+                                   @Qualifier("taskExecutor") Executor taskExecutor) {
+        this.rentalUnitRepository = rentalUnitRepository;
+        this.occupancyHistoryRepository = occupancyHistoryRepository;
+        this.unitRentPaymentRepository = unitRentPaymentRepository;
+        this.tenantRepository = tenantRepository;
+        this.propertyRepository = propertyRepository;
+        this.rentBalanceService = rentBalanceService;
+        this.walletServiceClient = walletServiceClient;
+        this.emailService = emailService;
+        this.smsService = smsService;
+        this.taskExecutor = taskExecutor;
+    }
 
     @Transactional
     public UnitRentPaymentResponse recordPayment(UnitRentPaymentRequest request, String tenantId) {
@@ -83,18 +120,21 @@ public class UnitRentPaymentService {
 
         UnitRentPayment saved = unitRentPaymentRepository.save(payment);
 
-        recordInWallet(saved);
+        // Fire-and-forget — never blocks the response. Failures inside
+        // these are already logged individually; nothing further to
+        // await here.
+        taskExecutor.execute(() -> recordInWallet(saved));
 
         if (status == PaymentStatus.OVERPAID) {
-            notifyTenantOfOverpayment(tenantId, unit, balanceAfter.negate());
+            taskExecutor.execute(() -> notifyTenantOfOverpayment(tenantId, unit, balanceAfter.negate()));
         }
 
-        return toResponse(saved);
+        return toResponse(saved, unit);
     }
 
     public List<UnitRentPaymentResponse> getPaymentHistory(String rentalUnitId) {
         return unitRentPaymentRepository.findByRentalUnitId(rentalUnitId).stream()
-                .map(this::toResponse)
+                .map(payment -> toResponse(payment, null))
                 .toList();
     }
 
@@ -119,7 +159,8 @@ public class UnitRentPaymentService {
 
     /**
      * Best-effort call to Wallet Service, mirroring LeaseRentPaymentService's
-     * lease-based equivalent — failures are logged, never thrown.
+     * lease-based equivalent — failures are logged, never thrown. Runs on
+     * taskExecutor, off the request thread.
      */
     private void recordInWallet(UnitRentPayment payment) {
         try {
@@ -144,7 +185,7 @@ public class UnitRentPaymentService {
     /**
      * Best-effort tenant notification about an overpayment credit — never
      * throws; a notification failure must not affect a payment already
-     * booked.
+     * booked. Runs on taskExecutor, off the request thread.
      */
     private void notifyTenantOfOverpayment(String tenantId, RentalUnit unit, BigDecimal creditAmount) {
         try {
@@ -174,7 +215,17 @@ public class UnitRentPaymentService {
                 + "owner if you'd prefer a refund instead.\n\nThank you for your prompt payment.";
     }
 
-    private UnitRentPaymentResponse toResponse(UnitRentPayment payment) {
+    // ------------------------------------------------------------------
+    // Mapping
+    // ------------------------------------------------------------------
+
+    /**
+     * @param unitHint the RentalUnit already loaded during recordPayment(),
+     *                 passed through to avoid a redundant lookup. Pass null
+     *                 (e.g. from getPaymentHistory()) to have it resolved
+     *                 fresh from the payment's rentalUnitId.
+     */
+    private UnitRentPaymentResponse toResponse(UnitRentPayment payment, RentalUnit unitHint) {
         UnitRentPaymentResponse response = new UnitRentPaymentResponse();
         response.setId(payment.getId());
         response.setRentalUnitId(payment.getRentalUnitId());
@@ -184,6 +235,55 @@ public class UnitRentPaymentService {
         response.setResultingBalance(payment.getResultingBalance());
         response.setDescription(payment.getDescription());
         response.setPaidAt(payment.getPaidAt());
+
+        if (payment.getTenantId() != null) {
+            tenantRepository.findById(payment.getTenantId())
+                    .ifPresent(tenant -> response.setTenant(toTenantSummary(tenant)));
+        }
+
+        RentalUnit unit = unitHint != null
+                ? unitHint
+                : (payment.getRentalUnitId() != null
+                        ? rentalUnitRepository.findById(payment.getRentalUnitId()).orElse(null)
+                        : null);
+
+        if (unit != null) {
+            response.setRentalUnit(toRentalUnitSummary(unit));
+
+            if (unit.getPropertyId() != null) {
+                propertyRepository.findById(unit.getPropertyId())
+                        .ifPresent(property -> response.setProperty(toPropertySummary(property)));
+            }
+        }
+
         return response;
+    }
+
+    private TenantSummaryResponse toTenantSummary(Tenant tenant) {
+        TenantSummaryResponse summary = new TenantSummaryResponse();
+        summary.setId(tenant.getId());
+        summary.setFullName(tenant.getFullName());
+        summary.setPhoneNumber(tenant.getPhoneNumber());
+        summary.setEmail(tenant.getEmail());
+        return summary;
+    }
+
+    private RentalUnitSummaryResponse toRentalUnitSummary(RentalUnit unit) {
+        RentalUnitSummaryResponse summary = new RentalUnitSummaryResponse();
+        summary.setId(unit.getId());
+        summary.setUnitNumber(unit.getUnitNumber());
+        summary.setFloor(unit.getFloor());
+        summary.setRentAmount(unit.getRentAmount());
+        summary.setStatus(unit.getStatus());
+        return summary;
+    }
+
+    private PropertySummaryResponse toPropertySummary(Property property) {
+        PropertySummaryResponse summary = new PropertySummaryResponse();
+        summary.setId(property.getId());
+        summary.setTitle(property.getTitle());
+        summary.setPropertyType(property.getPropertyType());
+        summary.setRegistrationNumber(property.getRegistrationNumber());
+        return summary;
     }
 }

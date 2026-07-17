@@ -22,6 +22,13 @@ spring:
           auth: true
           starttls:
             enable: true
+          # Explicit timeouts so a slow/unreachable SMTP server fails fast
+          # instead of hanging the thread that's sending the email. All in
+          # milliseconds. Without these, the JavaMail defaults are
+          # effectively "wait forever" on some JVMs/socket configs.
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
         transport:
           protocol: smtp
 

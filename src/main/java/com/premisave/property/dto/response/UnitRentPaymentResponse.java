@@ -17,4 +17,8 @@ public class UnitRentPaymentResponse {
     private BigDecimal resultingBalance;
     private String description;
     private LocalDateTime paidAt;
+
+    private TenantSummaryResponse tenant;
+    private RentalUnitSummaryResponse rentalUnit;
+    private PropertySummaryResponse property;
 }
