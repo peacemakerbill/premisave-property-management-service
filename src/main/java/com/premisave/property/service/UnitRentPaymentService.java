@@ -195,6 +195,12 @@ public class UnitRentPaymentService {
         // await here.
         taskExecutor.execute(() -> recordInWallet(saved));
 
+        // Best-effort payment confirmation — fires for every successful
+        // payment, exact/partial/overpaid alike. Separate from the
+        // overpayment notice below, which carries different, more specific
+        // messaging and only applies to the credit case.
+        taskExecutor.execute(() -> notifyPaymentReceived(tenantId, unit, saved));
+
         if (status == PaymentStatus.OVERPAID) {
             taskExecutor.execute(() -> notifyTenantOfOverpayment(tenantId, unit, balanceAfter.negate()));
         }
@@ -272,6 +278,49 @@ public class UnitRentPaymentService {
             log.error("Failed to record unit rent payment {} in wallet-service (tenantId={}, unitId={}): {}",
                     payment.getId(), payment.getTenantId(), payment.getRentalUnitId(), e.getMessage());
         }
+    }
+
+    /**
+     * Best-effort payment confirmation (email + SMS) — fires for every
+     * successful payment regardless of whether it was exact, partial, or
+     * overpaid. Kept separate from notifyTenantOfOverpayment, which only
+     * covers the credit case and carries different messaging; a payment
+     * that triggers both methods sends two distinct notices, by design.
+     * Never throws; a notification failure must not affect a payment
+     * that's already booked. Runs on taskExecutor, off the request thread.
+     */
+    private void notifyPaymentReceived(String tenantId, RentalUnit unit, UnitRentPayment payment) {
+        try {
+            tenantRepository.findById(tenantId).ifPresentOrElse(tenant -> {
+                String subject = "Payment Received";
+                String body = buildPaymentReceivedBody(tenant, payment);
+
+                boolean emailSent = emailService.sendNoticeEmail(
+                        tenant.getEmail(), tenant.getFullName(), subject, "PAYMENT_RECEIVED", body);
+
+                boolean smsSent = smsService.sendNoticeSms(
+                        tenant.getPhoneNumber(), subject + ": KES " + payment.getAmount() + " received.");
+
+                log.info("Payment confirmation sent for payment {} on unit {} (emailSent={}, smsSent={})",
+                        payment.getId(), unit.getId(), emailSent, smsSent);
+            }, () -> log.warn("Could not send payment confirmation — tenant {} not found", tenantId));
+        } catch (Exception e) {
+            log.error("Failed to send payment confirmation for payment {} on unit {}: {}",
+                    payment.getId(), unit.getId(), e.getMessage());
+        }
+    }
+
+    private String buildPaymentReceivedBody(Tenant tenant, UnitRentPayment payment) {
+        String name = tenant.getFullName() != null && !tenant.getFullName().isBlank()
+                ? tenant.getFullName() : "there";
+        StringBuilder body = new StringBuilder();
+        body.append("Hi ").append(name).append(",\n\n");
+        body.append("We've received your payment of KES ").append(payment.getAmount()).append(".\n\n");
+        if (payment.getDescription() != null && !payment.getDescription().isBlank()) {
+            body.append(payment.getDescription()).append("\n");
+        }
+        body.append("\nThank you for your payment.");
+        return body.toString();
     }
 
     /**
