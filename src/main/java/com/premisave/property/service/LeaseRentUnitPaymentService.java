@@ -8,6 +8,7 @@ import com.premisave.property.dto.response.LeaseRentPaymentResponse;
 import com.premisave.property.dto.response.PaymentDueResponse;
 import com.premisave.property.entity.Lease;
 import com.premisave.property.entity.LeaseRentUnitPayment;
+import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentSchedule;
 import com.premisave.property.entity.RentalUnit;
 import com.premisave.property.enums.PaymentStatus;
@@ -16,6 +17,7 @@ import com.premisave.property.exception.BadRequestException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.LeaseRentUnitPaymentRepository;
 import com.premisave.property.repository.LeaseRepository;
+import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentScheduleRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.SecurityDepositRepository;
@@ -48,6 +50,7 @@ public class LeaseRentUnitPaymentService {
     private final RentScheduleRepository rentScheduleRepository;
     private final LeaseRepository leaseRepository;
     private final RentalUnitRepository rentalUnitRepository;
+    private final PropertyRepository propertyRepository;
     private final SecurityDepositRepository securityDepositRepository;
     private final SecurityDepositService securityDepositService;
     private final WalletServiceClient walletServiceClient;
@@ -119,9 +122,10 @@ public class LeaseRentUnitPaymentService {
 
         boolean depositRequired;
         BigDecimal depositAmount;
+        RentalUnit unit = null;
 
         if (lease.getRentalUnitId() != null) {
-            RentalUnit unit = findUnitOrThrow(lease.getRentalUnitId());
+            unit = findUnitOrThrow(lease.getRentalUnitId());
             depositRequired = Boolean.TRUE.equals(unit.getDepositRequired());
             depositAmount = unit.getSecurityDeposit();
         } else {
@@ -177,11 +181,17 @@ public class LeaseRentUnitPaymentService {
         // that has already been booked against the lease's rent schedule.
         recordInWallet(saved, lease.getPropertyId());
 
+        // Fetched once here (not inside the async notification methods) so
+        // both notifications below reuse the same lookup instead of hitting
+        // Mongo twice for the same property.
+        Property property = propertyRepository.findById(lease.getPropertyId()).orElse(null);
+        RentalUnit notificationUnit = unit;
+
         // Best-effort payment confirmation — fires for every successful
         // payment, exact/partial/overpaid alike. Separate from the
         // overpayment notice below, which carries different, more specific
         // messaging and only applies to the spillover/credit case.
-        taskExecutor.execute(() -> notifyPaymentReceived(tenantId, lease, saved));
+        taskExecutor.execute(() -> notifyPaymentReceived(tenantId, lease, notificationUnit, property, saved));
 
         // Best-effort tenant notification — only when the payment spilled
         // into a future billing period or ended up as a pure credit (no
@@ -191,7 +201,8 @@ public class LeaseRentUnitPaymentService {
         // Dispatched via taskExecutor rather than called inline, so the
         // email/SMS round-trip doesn't add latency to the payment response.
         if (rentResult.spilloverOccurred()) {
-            taskExecutor.execute(() -> notifyTenantOfOverpayment(tenantId, lease, rentResult));
+            taskExecutor.execute(() ->
+                    notifyTenantOfOverpayment(tenantId, lease, notificationUnit, property, rentResult));
         }
 
         return toResponse(saved);
@@ -336,17 +347,19 @@ public class LeaseRentUnitPaymentService {
      * design. Never throws; a notification failure must not affect a
      * payment that's already booked.
      */
-    private void notifyPaymentReceived(String tenantId, Lease lease, LeaseRentUnitPayment payment) {
+    private void notifyPaymentReceived(String tenantId, Lease lease, RentalUnit unit, Property property,
+                                        LeaseRentUnitPayment payment) {
         try {
             tenantRepository.findById(tenantId).ifPresentOrElse(tenant -> {
                 String subject = "Payment Received";
-                String body = buildPaymentReceivedBody(tenant.getFullName(), payment);
+                String body = buildPaymentReceivedBody(tenant.getFullName(), unit, property, payment);
 
                 boolean emailSent = emailService.sendNoticeEmail(
                         tenant.getEmail(), tenant.getFullName(), subject, "PAYMENT_RECEIVED", body);
 
                 boolean smsSent = smsService.sendNoticeSms(
-                        tenant.getPhoneNumber(), subject + ": KES " + payment.getAmountPaid() + " received.");
+                        tenant.getPhoneNumber(), subject + " — " + locationSummary(unit, property)
+                                + ": KES " + payment.getAmountPaid() + " received.");
 
                 log.info("Payment confirmation sent for payment {} on lease {} (emailSent={}, smsSent={})",
                         payment.getId(), lease.getId(), emailSent, smsSent);
@@ -357,10 +370,12 @@ public class LeaseRentUnitPaymentService {
         }
     }
 
-    private String buildPaymentReceivedBody(String tenantName, LeaseRentUnitPayment payment) {
+    private String buildPaymentReceivedBody(String tenantName, RentalUnit unit, Property property,
+                                             LeaseRentUnitPayment payment) {
         StringBuilder body = new StringBuilder();
         body.append("Hi ").append(tenantName != null && !tenantName.isBlank() ? tenantName : "there").append(",\n\n");
-        body.append("We've received your payment of KES ").append(payment.getAmountPaid()).append(".\n\n");
+        body.append("We've received your payment of KES ").append(payment.getAmountPaid())
+                .append(" for ").append(locationSummary(unit, property)).append(".\n\n");
         if (payment.getDescription() != null && !payment.getDescription().isBlank()) {
             body.append(payment.getDescription()).append("\n");
         }
@@ -374,7 +389,8 @@ public class LeaseRentUnitPaymentService {
      * held because no further schedule entries exist. Never throws; a
      * notification failure must not affect a payment that's already booked.
      */
-    private void notifyTenantOfOverpayment(String tenantId, Lease lease, RentApplicationResult rentResult) {
+    private void notifyTenantOfOverpayment(String tenantId, Lease lease, RentalUnit unit, Property property,
+                                            RentApplicationResult rentResult) {
         try {
             tenantRepository.findById(tenantId).ifPresentOrElse(tenant -> {
                 boolean isPureCredit = rentResult.finalStatus() == PaymentStatus.OVERPAID;
@@ -382,13 +398,14 @@ public class LeaseRentUnitPaymentService {
                         ? "Overpayment Received — Credit on Your Account"
                         : "Payment Applied to Upcoming Rent";
 
-                String body = buildOverpaymentNotificationBody(tenant.getFullName(), isPureCredit, rentResult);
+                String body = buildOverpaymentNotificationBody(
+                        tenant.getFullName(), unit, property, isPureCredit, rentResult);
 
                 boolean emailSent = emailService.sendNoticeEmail(
                         tenant.getEmail(), tenant.getFullName(), subject, "PAYMENT_UPDATE", body);
 
                 boolean smsSent = smsService.sendNoticeSms(
-                        tenant.getPhoneNumber(), subject + ": " + body);
+                        tenant.getPhoneNumber(), subject + " (" + locationSummary(unit, property) + "): " + body);
 
                 log.info("Overpayment notification sent for tenant {} on lease {} (emailSent={}, smsSent={})",
                         tenantId, lease.getId(), emailSent, smsSent);
@@ -399,10 +416,11 @@ public class LeaseRentUnitPaymentService {
         }
     }
 
-    private String buildOverpaymentNotificationBody(String tenantName, boolean isPureCredit,
-                                                      RentApplicationResult rentResult) {
+    private String buildOverpaymentNotificationBody(String tenantName, RentalUnit unit, Property property,
+                                                      boolean isPureCredit, RentApplicationResult rentResult) {
         StringBuilder body = new StringBuilder();
         body.append("Hi ").append(tenantName != null && !tenantName.isBlank() ? tenantName : "there").append(",\n\n");
+        body.append("Regarding your account for ").append(locationSummary(unit, property)).append(":\n\n");
 
         if (isPureCredit) {
             body.append("Your recent rent payment exceeded the total amount currently due on your lease. ")
@@ -420,6 +438,24 @@ public class LeaseRentUnitPaymentService {
 
         body.append("\nThank you for your prompt payment.");
         return body.toString();
+    }
+
+    /**
+     * Human-readable "which property/unit is this about" fragment, used in
+     * both notification emails and SMS so a tenant on more than one
+     * lease/unit can tell them apart at a glance. Falls back gracefully if
+     * property or unit lookups came back empty (e.g. record deleted since
+     * the payment was made) — never lets a missing lookup break the
+     * notification itself.
+     */
+    private String locationSummary(RentalUnit unit, Property property) {
+        String propertyName = (property != null && property.getTitle() != null && !property.getTitle().isBlank())
+                ? property.getTitle() : "your property";
+
+        if (unit != null && unit.getUnitNumber() != null && !unit.getUnitNumber().isBlank()) {
+            return propertyName + ", Unit " + unit.getUnitNumber();
+        }
+        return propertyName;
     }
 
     private PaymentType resolvePaymentType(BigDecimal depositApplied, BigDecimal rentApplied) {
