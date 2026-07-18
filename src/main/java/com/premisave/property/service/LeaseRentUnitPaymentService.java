@@ -22,6 +22,7 @@ import com.premisave.property.repository.SecurityDepositRepository;
 import com.premisave.property.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
@@ -52,6 +54,9 @@ public class LeaseRentUnitPaymentService {
     private final TenantRepository tenantRepository;
     private final EmailService emailService;
     private final SmsService smsService;
+
+    @Qualifier("taskExecutor")
+    private final Executor taskExecutor;
 
     // ------------------------------------------------------------------
     // TODO(WALLET-INTEGRATION):
@@ -172,12 +177,21 @@ public class LeaseRentUnitPaymentService {
         // that has already been booked against the lease's rent schedule.
         recordInWallet(saved, lease.getPropertyId());
 
+        // Best-effort payment confirmation — fires for every successful
+        // payment, exact/partial/overpaid alike. Separate from the
+        // overpayment notice below, which carries different, more specific
+        // messaging and only applies to the spillover/credit case.
+        taskExecutor.execute(() -> notifyPaymentReceived(tenantId, lease, saved));
+
         // Best-effort tenant notification — only when the payment spilled
         // into a future billing period or ended up as a pure credit (no
         // more schedule entries left to apply it to). An ordinary
-        // exact/partial payment against the current period stays silent.
+        // exact/partial payment against the current period stays silent
+        // on THIS notice (it still gets the confirmation above).
+        // Dispatched via taskExecutor rather than called inline, so the
+        // email/SMS round-trip doesn't add latency to the payment response.
         if (rentResult.spilloverOccurred()) {
-            notifyTenantOfOverpayment(tenantId, lease, rentResult);
+            taskExecutor.execute(() -> notifyTenantOfOverpayment(tenantId, lease, rentResult));
         }
 
         return toResponse(saved);
@@ -311,6 +325,47 @@ public class LeaseRentUnitPaymentService {
             log.error("Failed to record rent payment {} in wallet-service (tenantId={}, leaseId={}): {}",
                     payment.getId(), payment.getTenantId(), payment.getLeaseId(), e.getMessage());
         }
+    }
+
+    /**
+     * Best-effort payment confirmation (email + SMS) — fires for every
+     * successful payment regardless of whether it was exact, partial, or
+     * overpaid. Kept separate from notifyTenantOfOverpayment, which only
+     * covers the spillover/credit case and carries different messaging;
+     * a payment that triggers both methods sends two distinct notices, by
+     * design. Never throws; a notification failure must not affect a
+     * payment that's already booked.
+     */
+    private void notifyPaymentReceived(String tenantId, Lease lease, LeaseRentUnitPayment payment) {
+        try {
+            tenantRepository.findById(tenantId).ifPresentOrElse(tenant -> {
+                String subject = "Payment Received";
+                String body = buildPaymentReceivedBody(tenant.getFullName(), payment);
+
+                boolean emailSent = emailService.sendNoticeEmail(
+                        tenant.getEmail(), tenant.getFullName(), subject, "PAYMENT_RECEIVED", body);
+
+                boolean smsSent = smsService.sendNoticeSms(
+                        tenant.getPhoneNumber(), subject + ": KES " + payment.getAmountPaid() + " received.");
+
+                log.info("Payment confirmation sent for payment {} on lease {} (emailSent={}, smsSent={})",
+                        payment.getId(), lease.getId(), emailSent, smsSent);
+            }, () -> log.warn("Could not send payment confirmation — tenant {} not found", tenantId));
+        } catch (Exception e) {
+            log.error("Failed to send payment confirmation for payment {} on lease {}: {}",
+                    payment.getId(), lease.getId(), e.getMessage());
+        }
+    }
+
+    private String buildPaymentReceivedBody(String tenantName, LeaseRentUnitPayment payment) {
+        StringBuilder body = new StringBuilder();
+        body.append("Hi ").append(tenantName != null && !tenantName.isBlank() ? tenantName : "there").append(",\n\n");
+        body.append("We've received your payment of KES ").append(payment.getAmountPaid()).append(".\n\n");
+        if (payment.getDescription() != null && !payment.getDescription().isBlank()) {
+            body.append(payment.getDescription()).append("\n");
+        }
+        body.append("\nThank you for your payment.");
+        return body.toString();
     }
 
     /**
