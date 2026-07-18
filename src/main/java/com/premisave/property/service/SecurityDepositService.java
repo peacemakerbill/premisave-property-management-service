@@ -310,12 +310,14 @@ public class SecurityDepositService {
             return;
         }
 
+        String location = resolveLocationSummary(deposit);
+
         String subject = "Security Deposit Received";
         String content = "We've recorded and held your security deposit of KES " + deposit.getAmount()
-                + ". This will be refunded (in full or in part) when your tenancy ends, subject to the "
-                + "condition of the property.";
+                + " for " + location + ". This will be refunded (in full or in part) when your tenancy ends, "
+                + "subject to the condition of the property.";
         String smsMessage = "Premisave: Your security deposit of KES " + deposit.getAmount()
-                + " has been recorded and held.";
+                + " for " + location + " has been recorded and held.";
 
         emailService.sendNoticeEmail(tenant.getEmail(), tenant.getFullName(), subject,
                 "SECURITY_DEPOSIT_HELD", content);
@@ -330,10 +332,11 @@ public class SecurityDepositService {
             return;
         }
 
+        String location = resolveLocationSummary(deposit);
         String subject = isFinalRefund ? "Security Deposit Fully Refunded" : "Security Deposit Partially Refunded";
 
         StringBuilder content = new StringBuilder("A refund of KES ").append(refundedNow)
-                .append(" has been issued against your security deposit.");
+                .append(" has been issued against your security deposit for ").append(location).append(".");
         if (reason != null && !reason.isBlank()) {
             content.append(" Reason: ").append(reason).append(".");
         }
@@ -344,7 +347,8 @@ public class SecurityDepositService {
         }
 
         StringBuilder smsMessage = new StringBuilder("Premisave: KES ").append(refundedNow)
-                .append(isFinalRefund ? " refunded — deposit fully settled." : " refunded from your deposit.");
+                .append(isFinalRefund ? " refunded — deposit fully settled (" : " refunded from your deposit (")
+                .append(location).append(").");
         if (!isFinalRefund) {
             smsMessage.append(" Remaining: KES ").append(remaining).append(".");
         }
@@ -352,6 +356,55 @@ public class SecurityDepositService {
         emailService.sendNoticeEmail(tenant.getEmail(), tenant.getFullName(), subject,
                 "SECURITY_DEPOSIT_REFUND", content.toString());
         smsService.sendNoticeSms(tenant.getPhoneNumber(), smsMessage.toString());
+    }
+
+    /**
+     * Resolves "which property/unit is this deposit about" the same way
+     * enrichWithSummaries() does for the API response — lease-backed
+     * deposits pull property (and unit, if any) from the Lease; unit-backed
+     * deposits pull property from the RentalUnit directly. Kept separate
+     * from enrichWithSummaries since that method populates a response DTO,
+     * while this one only needs a short display string for notifications.
+     */
+    private String resolveLocationSummary(SecurityDeposit deposit) {
+        String propertyId = null;
+        String rentalUnitId = deposit.getRentalUnitId();
+
+        if (deposit.getLeaseId() != null) {
+            Lease lease = leaseRepository.findById(deposit.getLeaseId()).orElse(null);
+            if (lease != null) {
+                propertyId = lease.getPropertyId();
+                if (rentalUnitId == null) {
+                    rentalUnitId = lease.getRentalUnitId(); // null for whole-property leases
+                }
+            }
+        }
+
+        RentalUnit unit = rentalUnitId != null ? rentalUnitRepository.findById(rentalUnitId).orElse(null) : null;
+        if (propertyId == null && unit != null) {
+            propertyId = unit.getPropertyId();
+        }
+
+        Property property = propertyId != null ? propertyRepository.findById(propertyId).orElse(null) : null;
+
+        return locationSummary(unit, property);
+    }
+
+    /**
+     * Human-readable "which property/unit is this about" fragment, used in
+     * both notification emails and SMS so a tenant with more than one
+     * deposit can tell them apart at a glance. Falls back gracefully if
+     * property or unit lookups came back empty — never lets a missing
+     * lookup break the notification itself.
+     */
+    private String locationSummary(RentalUnit unit, Property property) {
+        String propertyName = (property != null && property.getTitle() != null && !property.getTitle().isBlank())
+                ? property.getTitle() : "your property";
+
+        if (unit != null && unit.getUnitNumber() != null && !unit.getUnitNumber().isBlank()) {
+            return propertyName + ", Unit " + unit.getUnitNumber();
+        }
+        return propertyName;
     }
 
     // ------------------------------------------------------------------
