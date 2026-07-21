@@ -2,16 +2,11 @@ package com.premisave.property.dto.response;
 
 import lombok.Data;
 
-import java.util.List;
-
 @Data
-public class OccupancyReportResponse {
-    private String ownerId;
+public class PropertyOccupancyResponse {
+    private PropertySummaryResponse property;
     private long totalUnits;
     private long occupiedUnits;
     private long vacantUnits;
     private double occupancyRate;
-
-    private OwnerSummaryResponse owner;
-    private List<PropertyOccupancyResponse> properties;
 }

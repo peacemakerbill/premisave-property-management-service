@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 public class RevenueReportResponse {
@@ -11,5 +12,8 @@ public class RevenueReportResponse {
     private LocalDate periodStart;
     private LocalDate periodEnd;
     private BigDecimal totalRevenue;
-    private long paymentCount;
+    private int paymentCount;
+
+    private OwnerSummaryResponse owner;
+    private List<PropertyRevenueResponse> properties;
 }
