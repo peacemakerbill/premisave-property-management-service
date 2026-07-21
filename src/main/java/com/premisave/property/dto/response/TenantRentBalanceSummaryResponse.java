@@ -8,6 +8,7 @@ import java.util.List;
 @Data
 public class TenantRentBalanceSummaryResponse {
     private String tenantId;
+    private TenantSummaryResponse tenant;
 
     private BigDecimal totalArrearsOwed;
     private BigDecimal totalCreditAvailable;

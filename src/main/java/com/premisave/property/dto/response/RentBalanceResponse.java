@@ -22,4 +22,9 @@ public class RentBalanceResponse {
 
     private LocalDateTime lastChargeAt;
     private LocalDateTime lastPaymentAt;
+
+    private TenantSummaryResponse tenant;
+    private LeaseSummaryResponse lease;     // null for direct-unit balances
+    private PropertySummaryResponse property;
+    private RentalUnitSummaryResponse unit; // null for whole-property leases
 }

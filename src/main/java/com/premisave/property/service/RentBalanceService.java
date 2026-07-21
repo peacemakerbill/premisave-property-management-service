@@ -1,18 +1,26 @@
 package com.premisave.property.service;
 
+import com.premisave.property.dto.response.LeaseSummaryResponse;
+import com.premisave.property.dto.response.PropertySummaryResponse;
 import com.premisave.property.dto.response.RentBalanceResponse;
+import com.premisave.property.dto.response.RentalUnitSummaryResponse;
 import com.premisave.property.dto.response.TenantRentBalanceSummaryResponse;
+import com.premisave.property.dto.response.TenantSummaryResponse;
 import com.premisave.property.entity.Lease;
 import com.premisave.property.entity.OccupancyHistory;
+import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentBalance;
 import com.premisave.property.entity.RentSchedule;
 import com.premisave.property.entity.RentalUnit;
+import com.premisave.property.entity.Tenant;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.LeaseRepository;
 import com.premisave.property.repository.OccupancyHistoryRepository;
+import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentBalanceRepository;
 import com.premisave.property.repository.RentScheduleRepository;
 import com.premisave.property.repository.RentalUnitRepository;
+import com.premisave.property.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -41,6 +49,8 @@ public class RentBalanceService {
     private final LeaseRepository leaseRepository;
     private final OccupancyHistoryRepository occupancyHistoryRepository;
     private final RentalUnitRepository rentalUnitRepository;
+    private final PropertyRepository propertyRepository;
+    private final TenantRepository tenantRepository;
 
     // ------------------------------------------------------------------
     // Lease-based balances — derived live from RentSchedule, never
@@ -74,7 +84,7 @@ public class RentBalanceService {
                 .max(LocalDateTime::compareTo)
                 .orElse(null);
 
-        return buildResponse(lease.getTenantId(), leaseId, null, balance, null, lastPaymentAt);
+        return buildResponse(lease.getTenantId(), lease, null, balance, null, lastPaymentAt);
     }
 
     // ------------------------------------------------------------------
@@ -93,7 +103,9 @@ public class RentBalanceService {
                     return fresh;
                 });
 
-        return buildResponse(tenantId, null, rentalUnitId, balance.getBalance(),
+        RentalUnit unit = rentalUnitRepository.findById(rentalUnitId).orElse(null);
+
+        return buildResponse(tenantId, null, unit, balance.getBalance(),
                 balance.getLastChargeAt(), balance.getLastPaymentAt());
     }
 
@@ -220,12 +232,13 @@ public class RentBalanceService {
         summary.setTotalCreditAvailable(totalCredit);
         summary.setNetBalance(totalArrears.subtract(totalCredit));
         summary.setBreakdown(breakdown);
+        tenantRepository.findById(tenantId).ifPresent(tenant -> summary.setTenant(toTenantSummary(tenant)));
         return summary;
     }
 
     // ------------------------------------------------------------------
 
-    private RentBalanceResponse buildResponse(String tenantId, String leaseId, String rentalUnitId,
+    private RentBalanceResponse buildResponse(String tenantId, Lease lease, RentalUnit unit,
                                                BigDecimal balance, LocalDateTime lastChargeAt,
                                                LocalDateTime lastPaymentAt) {
         BigDecimal arrearsOwed = balance.compareTo(BigDecimal.ZERO) > 0 ? balance : BigDecimal.ZERO;
@@ -242,14 +255,103 @@ public class RentBalanceService {
 
         RentBalanceResponse response = new RentBalanceResponse();
         response.setTenantId(tenantId);
-        response.setLeaseId(leaseId);
-        response.setRentalUnitId(rentalUnitId);
+        response.setLeaseId(lease != null ? lease.getId() : null);
+        response.setRentalUnitId(unit != null ? unit.getId() : null);
         response.setBalance(balance);
         response.setArrearsOwed(arrearsOwed);
         response.setCreditAvailable(creditAvailable);
         response.setStatusMessage(message);
         response.setLastChargeAt(lastChargeAt);
         response.setLastPaymentAt(lastPaymentAt);
+
+        enrichWithSummaries(response, tenantId, lease, unit);
+
+        return response;
+    }
+
+    private void enrichWithSummaries(RentBalanceResponse response, String tenantId, Lease lease, RentalUnit unit) {
+        if (tenantId != null) {
+            tenantRepository.findById(tenantId).ifPresent(tenant -> response.setTenant(toTenantSummary(tenant)));
+        }
+
+        if (lease != null) {
+            response.setLease(toLeaseSummary(lease));
+        }
+
+        // Resolve the unit: if the caller already fetched it (direct-unit
+        // balance), use that. Otherwise, for a lease backed by a specific
+        // unit (not a whole-property lease), fetch it here.
+        RentalUnit resolvedUnit = unit;
+        if (resolvedUnit == null && lease != null && lease.getRentalUnitId() != null) {
+            resolvedUnit = rentalUnitRepository.findById(lease.getRentalUnitId()).orElse(null);
+        }
+        if (resolvedUnit != null) {
+            response.setUnit(toRentalUnitSummary(resolvedUnit));
+        }
+
+        String propertyId = lease != null ? lease.getPropertyId() : null;
+        if (propertyId == null && resolvedUnit != null) {
+            propertyId = resolvedUnit.getPropertyId();
+        }
+        if (propertyId != null) {
+            propertyRepository.findById(propertyId)
+                    .ifPresent(property -> response.setProperty(toPropertySummary(property)));
+        }
+    }
+
+    private TenantSummaryResponse toTenantSummary(Tenant tenant) {
+        TenantSummaryResponse summary = new TenantSummaryResponse();
+        summary.setId(tenant.getId());
+        summary.setFullName(tenant.getFullName());
+        summary.setPhoneNumber(tenant.getPhoneNumber());
+        summary.setEmail(tenant.getEmail());
+        return summary;
+    }
+
+    private LeaseSummaryResponse toLeaseSummary(Lease lease) {
+        LeaseSummaryResponse summary = new LeaseSummaryResponse();
+        summary.setId(lease.getId());
+        summary.setLeaseType(lease.getLeaseType());
+        summary.setStartDate(lease.getStartDate());
+        summary.setEndDate(lease.getEndDate());
+        summary.setMonthlyRent(lease.getMonthlyRent());
+        summary.setStatus(lease.getStatus());
+        return summary;
+    }
+
+    private PropertySummaryResponse toPropertySummary(Property property) {
+        PropertySummaryResponse summary = new PropertySummaryResponse();
+        summary.setId(property.getId());
+        summary.setTitle(property.getTitle());
+        summary.setPropertyType(property.getPropertyType());
+        summary.setAddress(toAddressResponse(property.getAddress()));
+        summary.setRegistrationNumber(property.getRegistrationNumber());
+        return summary;
+    }
+
+    private RentalUnitSummaryResponse toRentalUnitSummary(RentalUnit unit) {
+        RentalUnitSummaryResponse summary = new RentalUnitSummaryResponse();
+        summary.setId(unit.getId());
+        summary.setUnitNumber(unit.getUnitNumber());
+        summary.setFloor(unit.getFloor());
+        summary.setRentAmount(unit.getRentAmount());
+        summary.setStatus(unit.getStatus());
+        return summary;
+    }
+
+    private com.premisave.property.dto.response.AddressResponse toAddressResponse(
+            com.premisave.property.entity.Address address) {
+        if (address == null) {
+            return null;
+        }
+        com.premisave.property.dto.response.AddressResponse response =
+                new com.premisave.property.dto.response.AddressResponse();
+        response.setStreet(address.getStreet());
+        response.setCity(address.getCity());
+        response.setState(address.getState());
+        response.setCountry(address.getCountry());
+        response.setPostalCode(address.getPostalCode());
+        response.setLandmark(address.getLandmark());
         return response;
     }
 }

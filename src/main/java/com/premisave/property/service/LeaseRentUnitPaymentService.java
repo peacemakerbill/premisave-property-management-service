@@ -5,12 +5,17 @@ import com.premisave.property.dto.request.LeaseRentPaymentRequest;
 import com.premisave.property.dto.request.RecordRentPaymentRequest;
 import com.premisave.property.dto.request.SecurityDepositRequest;
 import com.premisave.property.dto.response.LeaseRentPaymentResponse;
+import com.premisave.property.dto.response.LeaseSummaryResponse;
 import com.premisave.property.dto.response.PaymentDueResponse;
+import com.premisave.property.dto.response.PropertySummaryResponse;
+import com.premisave.property.dto.response.RentalUnitSummaryResponse;
+import com.premisave.property.dto.response.TenantSummaryResponse;
 import com.premisave.property.entity.Lease;
 import com.premisave.property.entity.LeaseRentUnitPayment;
 import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentSchedule;
 import com.premisave.property.entity.RentalUnit;
+import com.premisave.property.entity.Tenant;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.PaymentType;
 import com.premisave.property.exception.BadRequestException;
@@ -81,9 +86,10 @@ public class LeaseRentUnitPaymentService {
         boolean depositRequired;
         boolean depositHeld = securityDepositRepository.findByLeaseId(leaseId).isPresent();
         BigDecimal depositAmount;
+        RentalUnit unit = null;
 
         if (lease.getRentalUnitId() != null) {
-            RentalUnit unit = findUnitOrThrow(lease.getRentalUnitId());
+            unit = findUnitOrThrow(lease.getRentalUnitId());
             depositRequired = Boolean.TRUE.equals(unit.getDepositRequired());
             depositAmount = unit.getSecurityDeposit();
         } else {
@@ -109,6 +115,20 @@ public class LeaseRentUnitPaymentService {
         response.setTotalDue(rentDue.add(depositDue));
         response.setDepositRequired(depositRequired);
         response.setDepositAlreadyHeld(depositHeld);
+
+        response.setLease(toLeaseSummary(lease));
+        if (unit != null) {
+            response.setUnit(toRentalUnitSummary(unit));
+        }
+        if (lease.getTenantId() != null) {
+            tenantRepository.findById(lease.getTenantId())
+                    .ifPresent(tenant -> response.setTenant(toTenantSummary(tenant)));
+        }
+        if (lease.getPropertyId() != null) {
+            propertyRepository.findById(lease.getPropertyId())
+                    .ifPresent(property -> response.setProperty(toPropertySummary(property)));
+        }
+
         return response;
     }
 
@@ -568,6 +588,7 @@ public class LeaseRentUnitPaymentService {
     private LeaseRentPaymentResponse toResponse(LeaseRentUnitPayment payment) {
         LeaseRentPaymentResponse response = new LeaseRentPaymentResponse();
         response.setId(payment.getId());
+        response.setLeaseId(payment.getLeaseId());
         response.setPaymentType(payment.getPaymentType());
         response.setAmount(payment.getAmountPaid());
         response.setRentAmountApplied(payment.getRentAmountApplied());
@@ -576,6 +597,86 @@ public class LeaseRentUnitPaymentService {
         response.setPaymentMethod(payment.getPaymentMethod());
         response.setPaidAt(payment.getPaidAt());
         response.setDescription(payment.getDescription());
+
+        if (payment.getTenantId() != null) {
+            tenantRepository.findById(payment.getTenantId())
+                    .ifPresent(tenant -> response.setTenant(toTenantSummary(tenant)));
+        }
+
+        if (payment.getLeaseId() != null) {
+            leaseRepository.findById(payment.getLeaseId()).ifPresent(lease -> {
+                response.setLease(toLeaseSummary(lease));
+                enrichWithPropertyAndUnit(response, lease);
+            });
+        }
+
+        return response;
+    }
+
+    private void enrichWithPropertyAndUnit(LeaseRentPaymentResponse response, Lease lease) {
+        if (lease.getPropertyId() != null) {
+            propertyRepository.findById(lease.getPropertyId())
+                    .ifPresent(property -> response.setProperty(toPropertySummary(property)));
+        }
+        if (lease.getRentalUnitId() != null) {
+            rentalUnitRepository.findById(lease.getRentalUnitId())
+                    .ifPresent(unit -> response.setUnit(toRentalUnitSummary(unit)));
+        }
+    }
+
+    private TenantSummaryResponse toTenantSummary(Tenant tenant) {
+        TenantSummaryResponse summary = new TenantSummaryResponse();
+        summary.setId(tenant.getId());
+        summary.setFullName(tenant.getFullName());
+        summary.setPhoneNumber(tenant.getPhoneNumber());
+        summary.setEmail(tenant.getEmail());
+        return summary;
+    }
+
+    private LeaseSummaryResponse toLeaseSummary(Lease lease) {
+        LeaseSummaryResponse summary = new LeaseSummaryResponse();
+        summary.setId(lease.getId());
+        summary.setLeaseType(lease.getLeaseType());
+        summary.setStartDate(lease.getStartDate());
+        summary.setEndDate(lease.getEndDate());
+        summary.setMonthlyRent(lease.getMonthlyRent());
+        summary.setStatus(lease.getStatus());
+        return summary;
+    }
+
+    private PropertySummaryResponse toPropertySummary(Property property) {
+        PropertySummaryResponse summary = new PropertySummaryResponse();
+        summary.setId(property.getId());
+        summary.setTitle(property.getTitle());
+        summary.setPropertyType(property.getPropertyType());
+        summary.setAddress(toAddressResponse(property.getAddress()));
+        summary.setRegistrationNumber(property.getRegistrationNumber());
+        return summary;
+    }
+
+    private RentalUnitSummaryResponse toRentalUnitSummary(RentalUnit unit) {
+        RentalUnitSummaryResponse summary = new RentalUnitSummaryResponse();
+        summary.setId(unit.getId());
+        summary.setUnitNumber(unit.getUnitNumber());
+        summary.setFloor(unit.getFloor());
+        summary.setRentAmount(unit.getRentAmount());
+        summary.setStatus(unit.getStatus());
+        return summary;
+    }
+
+    private com.premisave.property.dto.response.AddressResponse toAddressResponse(
+            com.premisave.property.entity.Address address) {
+        if (address == null) {
+            return null;
+        }
+        com.premisave.property.dto.response.AddressResponse response =
+                new com.premisave.property.dto.response.AddressResponse();
+        response.setStreet(address.getStreet());
+        response.setCity(address.getCity());
+        response.setState(address.getState());
+        response.setCountry(address.getCountry());
+        response.setPostalCode(address.getPostalCode());
+        response.setLandmark(address.getLandmark());
         return response;
     }
 

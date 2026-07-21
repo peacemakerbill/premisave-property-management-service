@@ -102,6 +102,16 @@ public class UnitRentPaymentService {
         response.setTotalDue(rentDue.add(depositDue));
         response.setDepositRequired(depositRequired);
         response.setDepositAlreadyHeld(depositHeld);
+
+        response.setUnit(toRentalUnitSummary(unit));
+        if (tenantId != null) {
+            tenantRepository.findById(tenantId).ifPresent(tenant -> response.setTenant(toTenantSummary(tenant)));
+        }
+        if (unit.getPropertyId() != null) {
+            propertyRepository.findById(unit.getPropertyId())
+                    .ifPresent(property -> response.setProperty(toPropertySummary(property)));
+        }
+
         return response;
     }
 
@@ -451,7 +461,24 @@ public class UnitRentPaymentService {
         summary.setId(property.getId());
         summary.setTitle(property.getTitle());
         summary.setPropertyType(property.getPropertyType());
+        summary.setAddress(toAddressResponse(property.getAddress()));
         summary.setRegistrationNumber(property.getRegistrationNumber());
         return summary;
+    }
+
+    private com.premisave.property.dto.response.AddressResponse toAddressResponse(
+            com.premisave.property.entity.Address address) {
+        if (address == null) {
+            return null;
+        }
+        com.premisave.property.dto.response.AddressResponse response =
+                new com.premisave.property.dto.response.AddressResponse();
+        response.setStreet(address.getStreet());
+        response.setCity(address.getCity());
+        response.setState(address.getState());
+        response.setCountry(address.getCountry());
+        response.setPostalCode(address.getPostalCode());
+        response.setLandmark(address.getLandmark());
+        return response;
     }
 }

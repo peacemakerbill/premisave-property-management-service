@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Data
 public class LeaseRentPaymentResponse {
     private String id;
+    private String leaseId;
     private PaymentType paymentType;
     private BigDecimal amount;
     private BigDecimal rentAmountApplied;
@@ -18,4 +19,9 @@ public class LeaseRentPaymentResponse {
     private PaymentMethod paymentMethod;
     private LocalDateTime paidAt;
     private String description;
+
+    private TenantSummaryResponse tenant;
+    private LeaseSummaryResponse lease;
+    private PropertySummaryResponse property;
+    private RentalUnitSummaryResponse unit; // null for whole-property leases
 }
