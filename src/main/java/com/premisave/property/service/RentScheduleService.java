@@ -1,12 +1,22 @@
 package com.premisave.property.service;
 
+import com.premisave.property.dto.response.LeaseSummaryResponse;
+import com.premisave.property.dto.response.PropertySummaryResponse;
 import com.premisave.property.dto.response.RentScheduleResponse;
+import com.premisave.property.dto.response.RentalUnitSummaryResponse;
+import com.premisave.property.dto.response.TenantSummaryResponse;
 import com.premisave.property.entity.Lease;
+import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentSchedule;
+import com.premisave.property.entity.RentalUnit;
+import com.premisave.property.entity.Tenant;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.LeaseRepository;
+import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentScheduleRepository;
+import com.premisave.property.repository.RentalUnitRepository;
+import com.premisave.property.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -23,6 +33,9 @@ public class RentScheduleService {
 
     private final RentScheduleRepository rentScheduleRepository;
     private final LeaseRepository leaseRepository;
+    private final RentalUnitRepository rentalUnitRepository;
+    private final PropertyRepository propertyRepository;
+    private final TenantRepository tenantRepository;
 
     @Transactional
     public List<RentSchedule> generateMonthlySchedule(String leaseId) {
@@ -47,8 +60,24 @@ public class RentScheduleService {
     }
 
     public List<RentScheduleResponse> getUpcomingPayments(String leaseId) {
+        Lease lease = leaseRepository.findById(leaseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lease not found"));
+
+        // Resolved ONCE per request, not per schedule entry — every entry
+        // in this list belongs to the same lease, so there's no reason to
+        // repeat these lookups across (potentially) dozens of entries.
+        TenantSummaryResponse tenantSummary = tenantRepository.findById(lease.getTenantId())
+                .map(this::toTenantSummary).orElse(null);
+        LeaseSummaryResponse leaseSummary = toLeaseSummary(lease);
+        RentalUnitSummaryResponse unitSummary = lease.getRentalUnitId() != null
+                ? rentalUnitRepository.findById(lease.getRentalUnitId()).map(this::toRentalUnitSummary).orElse(null)
+                : null; // whole-property lease — no specific unit
+        PropertySummaryResponse propertySummary = lease.getPropertyId() != null
+                ? propertyRepository.findById(lease.getPropertyId()).map(this::toPropertySummary).orElse(null)
+                : null;
+
         return rentScheduleRepository.findByLeaseId(leaseId).stream()
-                .map(this::toResponse)
+                .map(schedule -> toResponse(schedule, tenantSummary, leaseSummary, propertySummary, unitSummary))
                 .toList();
     }
 
@@ -63,13 +92,21 @@ public class RentScheduleService {
         rentScheduleRepository.saveAll(overdue);
     }
 
-    private RentScheduleResponse toResponse(RentSchedule schedule) {
+    private RentScheduleResponse toResponse(RentSchedule schedule, TenantSummaryResponse tenantSummary,
+                                             LeaseSummaryResponse leaseSummary,
+                                             PropertySummaryResponse propertySummary,
+                                             RentalUnitSummaryResponse unitSummary) {
         RentScheduleResponse response = new RentScheduleResponse();
         response.setId(schedule.getId());
         response.setDueDate(schedule.getDueDate());
         response.setAmountDue(schedule.getAmountDue());
         response.setAmountPaid(schedule.getAmountPaid());
         response.setStatus(schedule.getStatus());
+
+        response.setTenant(tenantSummary);
+        response.setLease(leaseSummary);
+        response.setProperty(propertySummary);
+        response.setUnit(unitSummary);
 
         applyPaymentSummary(response, schedule);
 
@@ -110,5 +147,61 @@ public class RentScheduleService {
             case FAILED -> "The last payment attempt for this period failed. Please try again.";
             case REFUNDED -> "This rent period's payment has been refunded.";
         };
+    }
+
+    private TenantSummaryResponse toTenantSummary(Tenant tenant) {
+        TenantSummaryResponse summary = new TenantSummaryResponse();
+        summary.setId(tenant.getId());
+        summary.setFullName(tenant.getFullName());
+        summary.setPhoneNumber(tenant.getPhoneNumber());
+        summary.setEmail(tenant.getEmail());
+        return summary;
+    }
+
+    private LeaseSummaryResponse toLeaseSummary(Lease lease) {
+        LeaseSummaryResponse summary = new LeaseSummaryResponse();
+        summary.setId(lease.getId());
+        summary.setLeaseType(lease.getLeaseType());
+        summary.setStartDate(lease.getStartDate());
+        summary.setEndDate(lease.getEndDate());
+        summary.setMonthlyRent(lease.getMonthlyRent());
+        summary.setStatus(lease.getStatus());
+        return summary;
+    }
+
+    private PropertySummaryResponse toPropertySummary(Property property) {
+        PropertySummaryResponse summary = new PropertySummaryResponse();
+        summary.setId(property.getId());
+        summary.setTitle(property.getTitle());
+        summary.setPropertyType(property.getPropertyType());
+        summary.setAddress(toAddressResponse(property.getAddress()));
+        summary.setRegistrationNumber(property.getRegistrationNumber());
+        return summary;
+    }
+
+    private RentalUnitSummaryResponse toRentalUnitSummary(RentalUnit unit) {
+        RentalUnitSummaryResponse summary = new RentalUnitSummaryResponse();
+        summary.setId(unit.getId());
+        summary.setUnitNumber(unit.getUnitNumber());
+        summary.setFloor(unit.getFloor());
+        summary.setRentAmount(unit.getRentAmount());
+        summary.setStatus(unit.getStatus());
+        return summary;
+    }
+
+    private com.premisave.property.dto.response.AddressResponse toAddressResponse(
+            com.premisave.property.entity.Address address) {
+        if (address == null) {
+            return null;
+        }
+        com.premisave.property.dto.response.AddressResponse response =
+                new com.premisave.property.dto.response.AddressResponse();
+        response.setStreet(address.getStreet());
+        response.setCity(address.getCity());
+        response.setState(address.getState());
+        response.setCountry(address.getCountry());
+        response.setPostalCode(address.getPostalCode());
+        response.setLandmark(address.getLandmark());
+        return response;
     }
 }

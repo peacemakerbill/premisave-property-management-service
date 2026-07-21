@@ -20,4 +20,12 @@ public class RentScheduleResponse {
     private BigDecimal balanceDue;
     private BigDecimal overpaidAmount;
     private String paymentMessage;
+
+    // Same lease/tenant/property/unit across every entry in a given
+    // response list — resolved once per request in the service, not per
+    // entry, since they're all for the same lease.
+    private TenantSummaryResponse tenant;
+    private LeaseSummaryResponse lease;
+    private PropertySummaryResponse property;
+    private RentalUnitSummaryResponse unit; // null for whole-property leases
 }
