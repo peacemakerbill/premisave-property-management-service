@@ -19,7 +19,6 @@ import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.exception.UnauthorizedException;
 import com.premisave.property.repository.OwnerRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,12 +32,6 @@ public class OwnerService {
 
     private final OwnerRepository ownerRepository;
     private final AuthServiceClient authServiceClient;
-
-    // Internal API key for server-to-server calls to auth-service (see
-    // AuthServiceClient's /internal/** endpoints). Passed explicitly per
-    // call rather than via a Feign interceptor.
-    @Value("${app.api-key}")
-    private String internalApiKey;
 
     @Transactional
     public OwnerResponse createOwner(CreateOwnerRequest request, String userId) {
@@ -60,17 +53,18 @@ public class OwnerService {
 
     /**
      * One-click owner profile creation — pulls fullName/phoneNumber/email
-     * directly from the user's auth-service account instead of requiring
-     * the person to retype them. Bank details aren't collected here; add
-     * them afterward via updateOwner().
+     * directly from the user's auth-service account (via their own JWT,
+     * forwarded to auth-service's /profile/me) instead of requiring the
+     * person to retype them. Bank details aren't collected here; add them
+     * afterward via updateOwner().
      */
     @Transactional
-    public OwnerResponse quickCreateOwner(String userId) {
+    public OwnerResponse quickCreateOwner(String userId, String authHeader) {
         ownerRepository.findByUserId(userId).ifPresent(existing -> {
             throw new ConflictException("Owner profile already exists for this user");
         });
 
-        UserDto authUser = fetchAuthUser(userId);
+        UserDto authUser = fetchAuthUser(authHeader);
         requireCompleteAuthProfile(authUser);
 
         Owner owner = new Owner();
@@ -91,11 +85,11 @@ public class OwnerService {
      * edits made directly on the owner profile are discarded on sync.
      */
     @Transactional
-    public OwnerResponse syncOwnerWithAuthProfile(String userId) {
+    public OwnerResponse syncOwnerWithAuthProfile(String userId, String authHeader) {
         Owner owner = ownerRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Owner profile not found"));
 
-        UserDto authUser = fetchAuthUser(userId);
+        UserDto authUser = fetchAuthUser(authHeader);
         requireCompleteAuthProfile(authUser);
 
         owner.setFullName(authUser.getFullName());
@@ -110,11 +104,11 @@ public class OwnerService {
      * auth-service before prompting the user to sync, rather than syncing
      * unconditionally on every page load.
      */
-    public ProfileSyncStatusResponse checkOwnerSyncStatus(String userId) {
+    public ProfileSyncStatusResponse checkOwnerSyncStatus(String userId, String authHeader) {
         Owner owner = ownerRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Owner profile not found"));
 
-        UserDto authUser = fetchAuthUser(userId);
+        UserDto authUser = fetchAuthUser(authHeader);
 
         List<String> outOfSync = new ArrayList<>();
         if (!Objects.equals(owner.getFullName(), authUser.getFullName())) {
@@ -136,8 +130,14 @@ public class OwnerService {
         return response;
     }
 
-    private UserDto fetchAuthUser(String userId) {
-        UserDto authUser = authServiceClient.getUserById(userId, internalApiKey);
+    /**
+     * Fetches the caller's own profile from auth-service by forwarding
+     * their JWT to /profile/me — auth-service enforces its own
+     * authentication on this call rather than us trusting a shared
+     * internal API key.
+     */
+    private UserDto fetchAuthUser(String authHeader) {
+        UserDto authUser = authServiceClient.getMyProfile(authHeader);
         if (authUser == null) {
             throw new ResourceNotFoundException("User account not found in auth service");
         }

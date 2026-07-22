@@ -27,11 +27,13 @@ public class TenantController {
     }
 
     // One-click registration — fullName/phoneNumber/email are pulled
-    // straight from the user's auth-service account, no form to fill in.
+    // straight from the user's auth-service account (via their own JWT),
+    // no form to fill in.
     @PostMapping("/quick-register")
     public ResponseEntity<TenantResponse> quickRegisterTenant(HttpServletRequest httpRequest) {
         String userId = resolveUserId(httpRequest);
-        return ResponseEntity.ok(tenantService.quickRegisterTenant(userId));
+        String authHeader = resolveAuthHeader(httpRequest);
+        return ResponseEntity.ok(tenantService.quickRegisterTenant(userId, authHeader));
     }
 
     // One-click sync — overwrites fullName/phoneNumber/email to match
@@ -39,7 +41,8 @@ public class TenantController {
     @PostMapping("/me/sync")
     public ResponseEntity<TenantResponse> syncMyTenantProfile(HttpServletRequest httpRequest) {
         String userId = resolveUserId(httpRequest);
-        return ResponseEntity.ok(tenantService.syncTenantWithAuthProfile(userId));
+        String authHeader = resolveAuthHeader(httpRequest);
+        return ResponseEntity.ok(tenantService.syncTenantWithAuthProfile(userId, authHeader));
     }
 
     // Lets the frontend decide whether to show a "your profile changed —
@@ -47,7 +50,8 @@ public class TenantController {
     @GetMapping("/me/sync-status")
     public ResponseEntity<ProfileSyncStatusResponse> checkMyTenantSyncStatus(HttpServletRequest httpRequest) {
         String userId = resolveUserId(httpRequest);
-        return ResponseEntity.ok(tenantService.checkTenantSyncStatus(userId));
+        String authHeader = resolveAuthHeader(httpRequest);
+        return ResponseEntity.ok(tenantService.checkTenantSyncStatus(userId, authHeader));
     }
 
     @GetMapping("/me")
@@ -74,5 +78,17 @@ public class TenantController {
             throw new IllegalStateException("No authenticated userId found on request");
         }
         return userId;
+    }
+
+    // The incoming Authorization header (still present on the request —
+    // JwtAuthFilter reads it but doesn't strip it) is forwarded as-is to
+    // auth-service's /profile/me so auth-service authenticates the same
+    // user that authenticated here.
+    private String resolveAuthHeader(HttpServletRequest httpRequest) {
+        String authHeader = httpRequest.getHeader("Authorization");
+        if (authHeader == null || authHeader.isBlank()) {
+            throw new IllegalStateException("No Authorization header found on request");
+        }
+        return authHeader;
     }
 }

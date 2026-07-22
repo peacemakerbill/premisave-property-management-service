@@ -15,7 +15,6 @@ import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.TenantRepository;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,12 +28,6 @@ public class TenantService {
 
     private final TenantRepository tenantRepository;
     private final AuthServiceClient authServiceClient;
-
-    // Internal API key for server-to-server calls to auth-service (see
-    // AuthServiceClient's /internal/** endpoints). Passed explicitly per
-    // call rather than via a Feign interceptor.
-    @Value("${app.api-key}")
-    private String internalApiKey;
 
     @Transactional
     public TenantResponse registerTenant(TenantRegistrationRequest request, String userId) {
@@ -73,18 +66,19 @@ public class TenantService {
 
     /**
      * One-click tenant registration — pulls fullName/phoneNumber/email
-     * directly from the user's auth-service account instead of requiring
-     * the person to retype them. idNumber/occupation/currentAddress aren't
+     * directly from the user's auth-service account (via their own JWT,
+     * forwarded to auth-service's /profile/me) instead of requiring the
+     * person to retype them. idNumber/occupation/currentAddress aren't
      * collected here (auth-service doesn't have idNumber, and they're all
      * optional on Tenant); add them afterward via updateTenantByUserId().
      */
     @Transactional
-    public TenantResponse quickRegisterTenant(String userId) {
+    public TenantResponse quickRegisterTenant(String userId, String authHeader) {
         tenantRepository.findByUserId(userId).ifPresent(existing -> {
             throw new ConflictException("A tenant profile already exists for this user");
         });
 
-        UserDto authUser = fetchAuthUser(userId);
+        UserDto authUser = fetchAuthUser(authHeader);
         requireCompleteAuthProfile(authUser);
 
         if (authUser.getEmail() != null) {
@@ -111,10 +105,10 @@ public class TenantService {
      * edits made directly on the tenant profile are discarded on sync.
      */
     @Transactional
-    public TenantResponse syncTenantWithAuthProfile(String userId) {
+    public TenantResponse syncTenantWithAuthProfile(String userId, String authHeader) {
         Tenant tenant = findTenantByUserIdOrThrow(userId);
 
-        UserDto authUser = fetchAuthUser(userId);
+        UserDto authUser = fetchAuthUser(authHeader);
         requireCompleteAuthProfile(authUser);
 
         tenant.setFullName(authUser.getFullName());
@@ -129,9 +123,9 @@ public class TenantService {
      * auth-service before prompting the user to sync, rather than syncing
      * unconditionally on every page load.
      */
-    public ProfileSyncStatusResponse checkTenantSyncStatus(String userId) {
+    public ProfileSyncStatusResponse checkTenantSyncStatus(String userId, String authHeader) {
         Tenant tenant = findTenantByUserIdOrThrow(userId);
-        UserDto authUser = fetchAuthUser(userId);
+        UserDto authUser = fetchAuthUser(authHeader);
 
         List<String> outOfSync = new ArrayList<>();
         if (!Objects.equals(tenant.getFullName(), authUser.getFullName())) {
@@ -153,8 +147,14 @@ public class TenantService {
         return response;
     }
 
-    private UserDto fetchAuthUser(String userId) {
-        UserDto authUser = authServiceClient.getUserById(userId, internalApiKey);
+    /**
+     * Fetches the caller's own profile from auth-service by forwarding
+     * their JWT to /profile/me — auth-service enforces its own
+     * authentication on this call rather than us trusting a shared
+     * internal API key.
+     */
+    private UserDto fetchAuthUser(String authHeader) {
+        UserDto authUser = authServiceClient.getMyProfile(authHeader);
         if (authUser == null) {
             throw new ResourceNotFoundException("User account not found in auth service");
         }

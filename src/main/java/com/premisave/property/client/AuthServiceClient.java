@@ -23,6 +23,10 @@ import java.util.Map;
 public interface AuthServiceClient {
 
     // ── Internal (API-key protected) ──────────────────────────────
+    // Retained for other internal cross-service lookups (e.g. by userId/email
+    // outside a user request context). NOT used for owner/tenant profile
+    // sync anymore — see getMyProfile() below, which forwards the caller's
+    // own JWT instead.
 
     @GetMapping("/internal/users/{userId}")
     UserDto getUserById(@PathVariable String userId,
@@ -33,6 +37,16 @@ public interface AuthServiceClient {
                            @RequestHeader("X-API-Key") String apiKey);
 
     // ── Profile (user-JWT protected — forward Authorization header) ──
+
+    /**
+     * Fetch the profile of whoever the forwarded JWT belongs to.
+     * Used by OwnerService/TenantService for quick-create, sync, and
+     * sync-status flows instead of the internal API-key endpoint —
+     * this way auth-service enforces its own auth on the request rather
+     * than trusting a shared secret.
+     */
+    @GetMapping("/profile/me")
+    UserDto getMyProfile(@RequestHeader("Authorization") String authHeader);
 
     @GetMapping("/profile/user/{userId}")
     UserDto getUserPublicProfile(@PathVariable String userId,
