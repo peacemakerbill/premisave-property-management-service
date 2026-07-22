@@ -2,6 +2,7 @@ package com.premisave.property.controller;
 
 import com.premisave.property.dto.request.TenantRegistrationRequest;
 import com.premisave.property.dto.request.UpdateTenantRequest;
+import com.premisave.property.dto.response.ProfileSyncStatusResponse;
 import com.premisave.property.dto.response.TenantResponse;
 import com.premisave.property.service.TenantService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +24,30 @@ public class TenantController {
         String userId = resolveUserId(httpRequest);
         TenantResponse tenant = tenantService.registerTenant(request, userId);
         return ResponseEntity.ok(tenant);
+    }
+
+    // One-click registration — fullName/phoneNumber/email are pulled
+    // straight from the user's auth-service account, no form to fill in.
+    @PostMapping("/quick-register")
+    public ResponseEntity<TenantResponse> quickRegisterTenant(HttpServletRequest httpRequest) {
+        String userId = resolveUserId(httpRequest);
+        return ResponseEntity.ok(tenantService.quickRegisterTenant(userId));
+    }
+
+    // One-click sync — overwrites fullName/phoneNumber/email to match
+    // whatever's currently on file in auth-service.
+    @PostMapping("/me/sync")
+    public ResponseEntity<TenantResponse> syncMyTenantProfile(HttpServletRequest httpRequest) {
+        String userId = resolveUserId(httpRequest);
+        return ResponseEntity.ok(tenantService.syncTenantWithAuthProfile(userId));
+    }
+
+    // Lets the frontend decide whether to show a "your profile changed —
+    // sync now?" prompt, without syncing unconditionally.
+    @GetMapping("/me/sync-status")
+    public ResponseEntity<ProfileSyncStatusResponse> checkMyTenantSyncStatus(HttpServletRequest httpRequest) {
+        String userId = resolveUserId(httpRequest);
+        return ResponseEntity.ok(tenantService.checkTenantSyncStatus(userId));
     }
 
     @GetMapping("/me")

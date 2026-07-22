@@ -3,6 +3,7 @@ package com.premisave.property.controller;
 import com.premisave.property.dto.request.CreateOwnerRequest;
 import com.premisave.property.dto.request.UpdateOwnerRequest;
 import com.premisave.property.dto.response.OwnerResponse;
+import com.premisave.property.dto.response.ProfileSyncStatusResponse;
 import com.premisave.property.service.OwnerService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -25,6 +26,30 @@ public class OwnerController {
         String userId = resolveUserId(httpRequest);
         OwnerResponse owner = ownerService.createOwner(request, userId);
         return ResponseEntity.ok(owner);
+    }
+
+    // One-click creation — fullName/phoneNumber/email are pulled straight
+    // from the user's auth-service account, no form to fill in.
+    @PostMapping("/quick")
+    public ResponseEntity<OwnerResponse> quickCreateOwner(HttpServletRequest httpRequest) {
+        String userId = resolveUserId(httpRequest);
+        return ResponseEntity.ok(ownerService.quickCreateOwner(userId));
+    }
+
+    // One-click sync — overwrites fullName/phoneNumber/email to match
+    // whatever's currently on file in auth-service.
+    @PostMapping("/me/sync")
+    public ResponseEntity<OwnerResponse> syncMyOwnerProfile(HttpServletRequest httpRequest) {
+        String userId = resolveUserId(httpRequest);
+        return ResponseEntity.ok(ownerService.syncOwnerWithAuthProfile(userId));
+    }
+
+    // Lets the frontend decide whether to show a "your profile changed —
+    // sync now?" prompt, without syncing unconditionally.
+    @GetMapping("/me/sync-status")
+    public ResponseEntity<ProfileSyncStatusResponse> checkMyOwnerSyncStatus(HttpServletRequest httpRequest) {
+        String userId = resolveUserId(httpRequest);
+        return ResponseEntity.ok(ownerService.checkOwnerSyncStatus(userId));
     }
 
     @GetMapping("/me")

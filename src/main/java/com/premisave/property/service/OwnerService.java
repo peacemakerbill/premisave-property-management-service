@@ -1,5 +1,6 @@
 package com.premisave.property.service;
 
+import com.premisave.property.client.AuthServiceClient;
 import com.premisave.property.dto.request.AddressRequest;
 import com.premisave.property.dto.request.BankDetailsRequest;
 import com.premisave.property.dto.request.CreateOwnerRequest;
@@ -7,22 +8,37 @@ import com.premisave.property.dto.request.UpdateOwnerRequest;
 import com.premisave.property.dto.response.AddressResponse;
 import com.premisave.property.dto.response.BankDetailsResponse;
 import com.premisave.property.dto.response.OwnerResponse;
+import com.premisave.property.dto.response.ProfileSyncStatusResponse;
+import com.premisave.property.dto.response.UserDto;
 import com.premisave.property.entity.Address;
 import com.premisave.property.entity.BankDetails;
 import com.premisave.property.entity.Owner;
+import com.premisave.property.exception.BadRequestException;
 import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.exception.UnauthorizedException;
 import com.premisave.property.repository.OwnerRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class OwnerService {
 
     private final OwnerRepository ownerRepository;
+    private final AuthServiceClient authServiceClient;
+
+    // Internal API key for server-to-server calls to auth-service (see
+    // AuthServiceClient's /internal/** endpoints). Passed explicitly per
+    // call rather than via a Feign interceptor.
+    @Value("${app.api-key}")
+    private String internalApiKey;
 
     @Transactional
     public OwnerResponse createOwner(CreateOwnerRequest request, String userId) {
@@ -40,6 +56,106 @@ public class OwnerService {
         owner.setIsVerified(false);
 
         return toResponse(ownerRepository.save(owner));
+    }
+
+    /**
+     * One-click owner profile creation — pulls fullName/phoneNumber/email
+     * directly from the user's auth-service account instead of requiring
+     * the person to retype them. Bank details aren't collected here; add
+     * them afterward via updateOwner().
+     */
+    @Transactional
+    public OwnerResponse quickCreateOwner(String userId) {
+        ownerRepository.findByUserId(userId).ifPresent(existing -> {
+            throw new ConflictException("Owner profile already exists for this user");
+        });
+
+        UserDto authUser = fetchAuthUser(userId);
+        requireCompleteAuthProfile(authUser);
+
+        Owner owner = new Owner();
+        owner.setUserId(userId);
+        owner.setFullName(authUser.getFullName());
+        owner.setPhoneNumber(authUser.getPhoneNumber());
+        owner.setEmail(authUser.getEmail());
+        owner.setIsActive(true);
+        owner.setIsVerified(false);
+
+        return toResponse(ownerRepository.save(owner));
+    }
+
+    /**
+     * Overwrites fullName/phoneNumber/email on the owner profile to match
+     * whatever is currently on file in auth-service. Auth-service is
+     * always treated as the source of truth for these fields — any local
+     * edits made directly on the owner profile are discarded on sync.
+     */
+    @Transactional
+    public OwnerResponse syncOwnerWithAuthProfile(String userId) {
+        Owner owner = ownerRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Owner profile not found"));
+
+        UserDto authUser = fetchAuthUser(userId);
+        requireCompleteAuthProfile(authUser);
+
+        owner.setFullName(authUser.getFullName());
+        owner.setPhoneNumber(authUser.getPhoneNumber());
+        owner.setEmail(authUser.getEmail());
+
+        return toResponse(ownerRepository.save(owner));
+    }
+
+    /**
+     * Lets the frontend check whether the owner profile has drifted from
+     * auth-service before prompting the user to sync, rather than syncing
+     * unconditionally on every page load.
+     */
+    public ProfileSyncStatusResponse checkOwnerSyncStatus(String userId) {
+        Owner owner = ownerRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Owner profile not found"));
+
+        UserDto authUser = fetchAuthUser(userId);
+
+        List<String> outOfSync = new ArrayList<>();
+        if (!Objects.equals(owner.getFullName(), authUser.getFullName())) {
+            outOfSync.add("fullName");
+        }
+        if (!Objects.equals(owner.getPhoneNumber(), authUser.getPhoneNumber())) {
+            outOfSync.add("phoneNumber");
+        }
+        if (!Objects.equals(owner.getEmail(), authUser.getEmail())) {
+            outOfSync.add("email");
+        }
+
+        ProfileSyncStatusResponse response = new ProfileSyncStatusResponse();
+        response.setInSync(outOfSync.isEmpty());
+        response.setOutOfSyncFields(outOfSync);
+        response.setLatestFullName(authUser.getFullName());
+        response.setLatestPhoneNumber(authUser.getPhoneNumber());
+        response.setLatestEmail(authUser.getEmail());
+        return response;
+    }
+
+    private UserDto fetchAuthUser(String userId) {
+        UserDto authUser = authServiceClient.getUserById(userId, internalApiKey);
+        if (authUser == null) {
+            throw new ResourceNotFoundException("User account not found in auth service");
+        }
+        return authUser;
+    }
+
+    // Defensive guard — quick-create/sync bypass CreateOwnerRequest's own
+    // @NotBlank validation entirely, so this re-checks the same invariant
+    // against whatever auth-service actually returned.
+    private void requireCompleteAuthProfile(UserDto authUser) {
+        if (authUser.getFullName() == null || authUser.getFullName().isBlank()) {
+            throw new BadRequestException(
+                    "Your account is missing a full name. Please update your profile before continuing.");
+        }
+        if (authUser.getPhoneNumber() == null || authUser.getPhoneNumber().isBlank()) {
+            throw new BadRequestException(
+                    "Your account is missing a phone number. Please update your profile before continuing.");
+        }
     }
 
     public OwnerResponse getOwnerById(String id) {

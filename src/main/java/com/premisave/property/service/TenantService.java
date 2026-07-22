@@ -1,9 +1,12 @@
 package com.premisave.property.service;
 
+import com.premisave.property.client.AuthServiceClient;
 import com.premisave.property.dto.request.TenantRegistrationRequest;
 import com.premisave.property.dto.request.UpdateTenantRequest;
 import com.premisave.property.dto.response.AddressResponse;
+import com.premisave.property.dto.response.ProfileSyncStatusResponse;
 import com.premisave.property.dto.response.TenantResponse;
+import com.premisave.property.dto.response.UserDto;
 import com.premisave.property.entity.Address;
 import com.premisave.property.entity.Tenant;
 import com.premisave.property.exception.BadRequestException;
@@ -12,14 +15,26 @@ import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.TenantRepository;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class TenantService {
 
     private final TenantRepository tenantRepository;
+    private final AuthServiceClient authServiceClient;
+
+    // Internal API key for server-to-server calls to auth-service (see
+    // AuthServiceClient's /internal/** endpoints). Passed explicitly per
+    // call rather than via a Feign interceptor.
+    @Value("${app.api-key}")
+    private String internalApiKey;
 
     @Transactional
     public TenantResponse registerTenant(TenantRegistrationRequest request, String userId) {
@@ -54,6 +69,110 @@ public class TenantService {
         tenant.setIsBlacklisted(false);
 
         return toResponse(tenantRepository.save(tenant));
+    }
+
+    /**
+     * One-click tenant registration — pulls fullName/phoneNumber/email
+     * directly from the user's auth-service account instead of requiring
+     * the person to retype them. idNumber/occupation/currentAddress aren't
+     * collected here (auth-service doesn't have idNumber, and they're all
+     * optional on Tenant); add them afterward via updateTenantByUserId().
+     */
+    @Transactional
+    public TenantResponse quickRegisterTenant(String userId) {
+        tenantRepository.findByUserId(userId).ifPresent(existing -> {
+            throw new ConflictException("A tenant profile already exists for this user");
+        });
+
+        UserDto authUser = fetchAuthUser(userId);
+        requireCompleteAuthProfile(authUser);
+
+        if (authUser.getEmail() != null) {
+            tenantRepository.findByEmail(authUser.getEmail()).ifPresent(existing -> {
+                throw new ConflictException("A tenant with this email is already registered");
+            });
+        }
+
+        Tenant tenant = new Tenant();
+        tenant.setUserId(userId);
+        tenant.setFullName(authUser.getFullName());
+        tenant.setPhoneNumber(authUser.getPhoneNumber());
+        tenant.setEmail(authUser.getEmail());
+        tenant.setIsActive(true);
+        tenant.setIsBlacklisted(false);
+
+        return toResponse(tenantRepository.save(tenant));
+    }
+
+    /**
+     * Overwrites fullName/phoneNumber/email on the tenant profile to match
+     * whatever is currently on file in auth-service. Auth-service is
+     * always treated as the source of truth for these fields — any local
+     * edits made directly on the tenant profile are discarded on sync.
+     */
+    @Transactional
+    public TenantResponse syncTenantWithAuthProfile(String userId) {
+        Tenant tenant = findTenantByUserIdOrThrow(userId);
+
+        UserDto authUser = fetchAuthUser(userId);
+        requireCompleteAuthProfile(authUser);
+
+        tenant.setFullName(authUser.getFullName());
+        tenant.setPhoneNumber(authUser.getPhoneNumber());
+        tenant.setEmail(authUser.getEmail());
+
+        return toResponse(tenantRepository.save(tenant));
+    }
+
+    /**
+     * Lets the frontend check whether the tenant profile has drifted from
+     * auth-service before prompting the user to sync, rather than syncing
+     * unconditionally on every page load.
+     */
+    public ProfileSyncStatusResponse checkTenantSyncStatus(String userId) {
+        Tenant tenant = findTenantByUserIdOrThrow(userId);
+        UserDto authUser = fetchAuthUser(userId);
+
+        List<String> outOfSync = new ArrayList<>();
+        if (!Objects.equals(tenant.getFullName(), authUser.getFullName())) {
+            outOfSync.add("fullName");
+        }
+        if (!Objects.equals(tenant.getPhoneNumber(), authUser.getPhoneNumber())) {
+            outOfSync.add("phoneNumber");
+        }
+        if (!Objects.equals(tenant.getEmail(), authUser.getEmail())) {
+            outOfSync.add("email");
+        }
+
+        ProfileSyncStatusResponse response = new ProfileSyncStatusResponse();
+        response.setInSync(outOfSync.isEmpty());
+        response.setOutOfSyncFields(outOfSync);
+        response.setLatestFullName(authUser.getFullName());
+        response.setLatestPhoneNumber(authUser.getPhoneNumber());
+        response.setLatestEmail(authUser.getEmail());
+        return response;
+    }
+
+    private UserDto fetchAuthUser(String userId) {
+        UserDto authUser = authServiceClient.getUserById(userId, internalApiKey);
+        if (authUser == null) {
+            throw new ResourceNotFoundException("User account not found in auth service");
+        }
+        return authUser;
+    }
+
+    // Defensive guard — quick-register/sync bypass TenantRegistrationRequest's
+    // own manual validation entirely, so this re-checks the same invariant
+    // against whatever auth-service actually returned.
+    private void requireCompleteAuthProfile(UserDto authUser) {
+        if (authUser.getFullName() == null || authUser.getFullName().isBlank()) {
+            throw new BadRequestException(
+                    "Your account is missing a full name. Please update your profile before continuing.");
+        }
+        if (authUser.getPhoneNumber() == null || authUser.getPhoneNumber().isBlank()) {
+            throw new BadRequestException(
+                    "Your account is missing a phone number. Please update your profile before continuing.");
+        }
     }
 
     public TenantResponse getTenantById(String id) {
