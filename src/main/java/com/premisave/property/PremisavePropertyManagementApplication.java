@@ -3,10 +3,13 @@ package com.premisave.property;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication
+// Authentication here is JWT only (JwtAuthFilter). Nothing logs in with a username and password, so Spring
+// Boot's default in-memory user and its "Using generated security password" log line are switched off.
+@SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
 @EnableFeignClients
 @EnableScheduling
 public class PremisavePropertyManagementApplication {
