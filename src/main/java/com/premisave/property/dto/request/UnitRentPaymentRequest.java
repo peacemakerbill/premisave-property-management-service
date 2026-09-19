@@ -16,7 +16,11 @@ public class UnitRentPaymentRequest {
     @NotNull
     private BigDecimal amount;
 
-    // TODO(WALLET-INTEGRATION): same as lease rent payments — advisory
-    // metadata only for now, no live gateway call happens from here.
+    // Optional. Payments are made from the tenant's Premisave wallet, so only
+    // WALLET (or omitted) is accepted.
     private PaymentMethod paymentMethod;
+
+    // Optional idempotency key, 1-40 chars of letters/digits/. _ : -
+    // Reuse it when retrying so the tenant is never charged twice.
+    private String reference;
 }

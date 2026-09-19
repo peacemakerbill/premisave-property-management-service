@@ -17,6 +17,7 @@ public class LeaseRentPaymentResponse {
     private BigDecimal depositAmountApplied;
     private String status;
     private PaymentMethod paymentMethod;
+    private String paymentReference;   // the wallet-service transfer reference
     private LocalDateTime paidAt;
     private String description;
 

@@ -14,6 +14,7 @@ public class UnitRentPaymentResponse {
     private String rentalUnitId;
     private BigDecimal amount;
     private PaymentMethod paymentMethod;
+    private String paymentReference;   // the wallet-service transfer reference
     private PaymentType paymentType;
     private BigDecimal depositAmountApplied;
     private BigDecimal rentAmountApplied;

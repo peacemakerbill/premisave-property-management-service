@@ -14,12 +14,15 @@ import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentalUnit;
 import com.premisave.property.entity.Tenant;
 import com.premisave.property.entity.UtilityBill;
+import com.premisave.property.entity.WalletTransfer;
 import com.premisave.property.enums.MeterType;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.UtilityType;
+import com.premisave.property.enums.WalletTransferPurpose;
 import com.premisave.property.exception.BadRequestException;
 import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
+import com.premisave.property.exception.UnauthorizedException;
 import com.premisave.property.repository.MeterReadingRepository;
 import com.premisave.property.repository.OccupancyHistoryRepository;
 import com.premisave.property.repository.PropertyRepository;
@@ -32,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -45,6 +49,7 @@ public class UtilityBillingService {
     private final TenantRepository tenantRepository;
     private final PropertyRepository propertyRepository;
     private final UtilityRatesProperties utilityRatesProperties;
+    private final WalletPaymentService walletPaymentService;
 
     @Transactional
     public UtilityBillResponse generateBill(UtilityBillRequest request) {
@@ -98,9 +103,32 @@ public class UtilityBillingService {
         return toResponse(utilityBillRepository.save(bill));
     }
 
+    /**
+     * Pays (part of) a utility bill from the calling tenant's Premisave wallet:
+     * the money moves tenant wallet -> property owner's wallet through
+     * wallet-service, then the payment is booked against the bill.
+     * Only the tenant the bill was issued to can pay it.
+     */
     @Transactional
-    public UtilityBillResponse payBill(PayUtilityBillRequest request) {
+    public UtilityBillResponse payBill(PayUtilityBillRequest request, String tenantId) {
+        walletPaymentService.assertWalletPaymentMethod(request.getPaymentMethod());
+
+        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Payment amount must be greater than zero");
+        }
+
+        String reference = walletPaymentService.resolveReference(tenantId, request.getReference());
+
         UtilityBill bill = findOrThrow(request.getBillId());
+
+        if (!tenantId.equals(bill.getTenantId())) {
+            throw new UnauthorizedException("You can only pay your own utility bills");
+        }
+
+        // Idempotent replay: this reference was already paid and booked on this bill.
+        if (bill.getPaymentReferences() != null && bill.getPaymentReferences().contains(reference)) {
+            return toResponse(bill);
+        }
 
         if (bill.getStatus() == PaymentStatus.PAID || bill.getStatus() == PaymentStatus.OVERPAID) {
             throw new ConflictException(
@@ -108,24 +136,43 @@ public class UtilityBillingService {
                             + ") and cannot accept further payments");
         }
 
-        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("Payment amount must be greater than zero");
+        RentalUnit unit = rentalUnitRepository.findById(bill.getRentalUnitId())
+                .orElseThrow(() -> new ResourceNotFoundException("Rental unit not found"));
+
+        // ---- Move the money: tenant wallet -> property owner's wallet --------------------------
+        WalletTransfer transfer = walletPaymentService.collect(new WalletPaymentService.CollectionCommand(
+                reference, tenantId, unit.getPropertyId(), WalletTransferPurpose.UTILITY_BILL, bill.getId(),
+                request.getAmount(), "Utility bill payment (" + bill.getUtilityType() + ")"));
+
+        // ---- Book it ---------------------------------------------------------------------------
+        UtilityBill saved;
+        try {
+            BigDecimal newAmountPaid = bill.getAmountPaid().add(request.getAmount());
+            int comparison = newAmountPaid.compareTo(bill.getAmount());
+
+            if (comparison == 0) {
+                bill.setStatus(PaymentStatus.PAID);
+            } else if (comparison > 0) {
+                bill.setStatus(PaymentStatus.OVERPAID);
+            } else {
+                bill.setStatus(PaymentStatus.PARTIALLY_PAID);
+            }
+
+            bill.setAmountPaid(newAmountPaid);
+
+            if (bill.getPaymentReferences() == null) {
+                bill.setPaymentReferences(new ArrayList<>());
+            }
+            bill.getPaymentReferences().add(transfer.getReference());
+
+            saved = utilityBillRepository.save(bill);
+        } catch (RuntimeException e) {
+            throw walletPaymentService.bookingFailed(transfer, e);
         }
 
-        BigDecimal newAmountPaid = bill.getAmountPaid().add(request.getAmount());
-        int comparison = newAmountPaid.compareTo(bill.getAmount());
+        walletPaymentService.markBooked(transfer.getReference(), saved.getId());
 
-        if (comparison == 0) {
-            bill.setStatus(PaymentStatus.PAID);
-        } else if (comparison > 0) {
-            bill.setStatus(PaymentStatus.OVERPAID);
-        } else {
-            bill.setStatus(PaymentStatus.PARTIALLY_PAID);
-        }
-
-        bill.setAmountPaid(newAmountPaid);
-
-        return toResponse(utilityBillRepository.save(bill));
+        return toResponse(saved);
     }
 
     public UtilityBillResponse getBill(String id) {

@@ -64,6 +64,14 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    // Payment could not be completed/confirmed with wallet-service, or was
+    // debited but not yet recorded. Retryable with the same reference.
+    @ExceptionHandler(WalletServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleWalletService(WalletServiceException ex) {
+        log.warn("Wallet payment problem: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneralException(Exception ex) {
         log.error("Unhandled exception", ex);

@@ -1,7 +1,5 @@
 package com.premisave.property.service;
 
-import com.premisave.property.client.WalletServiceClient;
-import com.premisave.property.dto.request.RecordRentPaymentRequest;
 import com.premisave.property.dto.request.SecurityDepositRequest;
 import com.premisave.property.dto.request.UnitRentPaymentRequest;
 import com.premisave.property.dto.response.PaymentDueResponse;
@@ -15,9 +13,13 @@ import com.premisave.property.entity.RentBalance;
 import com.premisave.property.entity.RentalUnit;
 import com.premisave.property.entity.Tenant;
 import com.premisave.property.entity.UnitRentPayment;
+import com.premisave.property.entity.WalletTransfer;
+import com.premisave.property.enums.PaymentMethod;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.PaymentType;
+import com.premisave.property.enums.WalletTransferPurpose;
 import com.premisave.property.exception.BadRequestException;
+import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.OccupancyHistoryRepository;
 import com.premisave.property.repository.PropertyRepository;
@@ -32,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 
 @Slf4j
@@ -45,17 +48,13 @@ public class UnitRentPaymentService {
     private final PropertyRepository propertyRepository;
     private final RentBalanceService rentBalanceService;
     private final SecurityDepositService securityDepositService;
-    private final WalletServiceClient walletServiceClient;
+    private final WalletPaymentService walletPaymentService;
     private final EmailService emailService;
     private final SmsService smsService;
 
-    // Post-payment side effects (wallet-service call, overpayment
-    // notification — which includes a synchronous SMTP send via
-    // EmailService) run here instead of on the request thread. SMTP
-    // round-trips are the slowest part of this request by far; moving
-    // them off-thread is what makes /api/v1/rent/units/pay fast. Reuses
-    // the project's existing "taskExecutor" bean (see AsyncConfig) rather
-    // than introducing a second thread pool.
+    // Post-payment notifications (which include a synchronous SMTP send via
+    // EmailService) run here instead of on the request thread. Reuses the
+    // project's existing "taskExecutor" bean (see AsyncConfig).
     private final Executor taskExecutor;
 
     public UnitRentPaymentService(RentalUnitRepository rentalUnitRepository,
@@ -65,7 +64,7 @@ public class UnitRentPaymentService {
                                    PropertyRepository propertyRepository,
                                    RentBalanceService rentBalanceService,
                                    SecurityDepositService securityDepositService,
-                                   WalletServiceClient walletServiceClient,
+                                   WalletPaymentService walletPaymentService,
                                    EmailService emailService,
                                    SmsService smsService,
                                    @Qualifier("taskExecutor") Executor taskExecutor) {
@@ -76,7 +75,7 @@ public class UnitRentPaymentService {
         this.propertyRepository = propertyRepository;
         this.rentBalanceService = rentBalanceService;
         this.securityDepositService = securityDepositService;
-        this.walletServiceClient = walletServiceClient;
+        this.walletPaymentService = walletPaymentService;
         this.emailService = emailService;
         this.smsService = smsService;
         this.taskExecutor = taskExecutor;
@@ -120,6 +119,23 @@ public class UnitRentPaymentService {
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Payment amount must be greater than zero");
         }
+        walletPaymentService.assertWalletPaymentMethod(request.getPaymentMethod());
+
+        String reference = walletPaymentService.resolveReference(tenantId, request.getReference());
+
+        // Idempotent replay: this reference was already paid and booked — return that payment,
+        // don't touch the wallet or the rent balance again.
+        Optional<UnitRentPayment> replay = unitRentPaymentRepository.findByPaymentReference(reference);
+        if (replay.isPresent()) {
+            UnitRentPayment existing = replay.get();
+            boolean sameRequest = request.getRentalUnitId().equals(existing.getRentalUnitId())
+                    && tenantId.equals(existing.getTenantId())
+                    && request.getAmount().compareTo(existing.getAmount()) == 0;
+            if (!sameRequest) {
+                throw new ConflictException("This payment reference was already used for a different payment");
+            }
+            return toResponse(existing, null);
+        }
 
         RentalUnit unit = rentalUnitRepository.findById(request.getRentalUnitId())
                 .orElseThrow(() -> new ResourceNotFoundException("Rental unit not found"));
@@ -137,78 +153,45 @@ public class UnitRentPaymentService {
                     "This unit's occupancy is lease-backed. Use the lease rent payment endpoint instead.");
         }
 
+        // ---- Validate everything BEFORE any money moves ----------------------------------------
         boolean depositRequired = Boolean.TRUE.equals(unit.getDepositRequired());
         BigDecimal depositAmount = unit.getSecurityDeposit();
         boolean depositAlreadyHeld = securityDepositService.hasActiveDeposit(unit.getId(), tenantId);
 
-        BigDecimal remaining = request.getAmount();
-        BigDecimal depositApplied = BigDecimal.ZERO;
-
+        BigDecimal depositToApply = BigDecimal.ZERO;
         if (depositRequired && !depositAlreadyHeld
                 && depositAmount != null
                 && depositAmount.compareTo(BigDecimal.ZERO) > 0) {
 
-            if (remaining.compareTo(depositAmount) < 0) {
+            if (request.getAmount().compareTo(depositAmount) < 0) {
                 throw new BadRequestException(
-                        "Payment of " + remaining + " is less than the required security deposit of "
+                        "Payment of " + request.getAmount() + " is less than the required security deposit of "
                                 + depositAmount + ". Deposit must be settled before or alongside rent.");
             }
-
-            SecurityDepositRequest depositRequest = new SecurityDepositRequest();
-            depositRequest.setRentalUnitId(unit.getId());
-            depositRequest.setTenantId(tenantId);
-            depositRequest.setAmount(depositAmount);
-            securityDepositService.holdDeposit(depositRequest);
-
-            depositApplied = depositAmount;
-            remaining = remaining.subtract(depositAmount);
+            depositToApply = depositAmount;
         }
 
-        PaymentStatus status;
-        BigDecimal balanceAfter;
+        BigDecimal rentPortion = request.getAmount().subtract(depositToApply);
 
-        if (remaining.compareTo(BigDecimal.ZERO) > 0) {
-            RentBalance balance = rentBalanceService.findOrCreateUnitBalance(
-                    unit.getId(), tenantId, unit.getPropertyId());
-
-            rentBalanceService.chargeElapsedMonthsIfNeeded(balance, unit.getRentAmount());
-            rentBalanceService.applyPayment(balance, remaining);
-
-            balanceAfter = balance.getBalance();
-            status = resolveStatus(balanceAfter);
-        } else {
-            // The entire payment went to the deposit — no rent portion to apply.
-            balanceAfter = rentBalanceService.getUnitBalance(unit.getId(), tenantId).getBalance();
-            status = PaymentStatus.PAID;
-        }
-
-        PaymentType paymentType = resolvePaymentType(depositApplied, remaining);
-
-        UnitRentPayment payment = new UnitRentPayment();
-        payment.setRentalUnitId(unit.getId());
-        payment.setTenantId(tenantId);
-        payment.setPropertyId(unit.getPropertyId());
-        payment.setAmount(request.getAmount());
-        payment.setPaymentMethod(request.getPaymentMethod());
-        payment.setPaymentType(paymentType);
-        payment.setDepositAmountApplied(depositApplied);
-        payment.setRentAmountApplied(remaining.compareTo(BigDecimal.ZERO) > 0 ? remaining : BigDecimal.ZERO);
-        payment.setStatus(status);
-        payment.setResultingBalance(balanceAfter);
-        payment.setPaidAt(LocalDateTime.now());
-        payment.setDescription(buildDescription(paymentType, depositApplied, status, balanceAfter));
-
-        UnitRentPayment saved = unitRentPaymentRepository.save(payment);
-
-        // Fetched once here (not inside the async notification methods) so
-        // both notifications below reuse the same lookup instead of hitting
-        // Mongo twice for the same property.
+        // Fetched once here so the description and both notifications below reuse the same lookup.
         Property property = propertyRepository.findById(unit.getPropertyId()).orElse(null);
 
-        // Fire-and-forget — never blocks the response. Failures inside
-        // these are already logged individually; nothing further to
-        // await here.
-        taskExecutor.execute(() -> recordInWallet(saved));
+        // ---- Move the money: tenant wallet -> property owner's wallet --------------------------
+        WalletTransfer transfer = walletPaymentService.collect(new WalletPaymentService.CollectionCommand(
+                reference, tenantId, unit.getPropertyId(), WalletTransferPurpose.UNIT_RENT, unit.getId(),
+                request.getAmount(), "Rent payment for " + locationSummary(unit, property)));
+
+        // ---- Book it ---------------------------------------------------------------------------
+        UnitBooking booking;
+        try {
+            booking = bookUnitPayment(unit, tenantId, request.getAmount(), transfer.getReference(),
+                    depositToApply, rentPortion);
+        } catch (RuntimeException e) {
+            throw walletPaymentService.bookingFailed(transfer, e);
+        }
+
+        UnitRentPayment saved = booking.payment();
+        walletPaymentService.markBooked(transfer.getReference(), saved.getId());
 
         // Best-effort payment confirmation — fires for every successful
         // payment, exact/partial/overpaid alike. Separate from the
@@ -216,8 +199,9 @@ public class UnitRentPaymentService {
         // messaging and only applies to the credit case.
         taskExecutor.execute(() -> notifyPaymentReceived(tenantId, unit, property, saved));
 
-        if (status == PaymentStatus.OVERPAID) {
-            taskExecutor.execute(() -> notifyTenantOfOverpayment(tenantId, unit, property, balanceAfter.negate()));
+        if (booking.status() == PaymentStatus.OVERPAID) {
+            BigDecimal creditAmount = booking.balanceAfter().negate();
+            taskExecutor.execute(() -> notifyTenantOfOverpayment(tenantId, unit, property, creditAmount));
         }
 
         return toResponse(saved, unit);
@@ -227,6 +211,61 @@ public class UnitRentPaymentService {
         return unitRentPaymentRepository.findByRentalUnitId(rentalUnitId).stream()
                 .map(payment -> toResponse(payment, null))
                 .toList();
+    }
+
+    /**
+     * Local booking once the money has moved: hold the deposit portion, apply the
+     * rent portion to the running RentBalance, and save the payment record.
+     */
+    private UnitBooking bookUnitPayment(RentalUnit unit, String tenantId, BigDecimal amount, String reference,
+                                         BigDecimal depositToApply, BigDecimal rentPortion) {
+        BigDecimal depositApplied = BigDecimal.ZERO;
+
+        if (depositToApply.compareTo(BigDecimal.ZERO) > 0) {
+            SecurityDepositRequest depositRequest = new SecurityDepositRequest();
+            depositRequest.setRentalUnitId(unit.getId());
+            depositRequest.setTenantId(tenantId);
+            depositRequest.setAmount(depositToApply);
+            securityDepositService.holdDeposit(depositRequest);
+            depositApplied = depositToApply;
+        }
+
+        PaymentStatus status;
+        BigDecimal balanceAfter;
+
+        if (rentPortion.compareTo(BigDecimal.ZERO) > 0) {
+            RentBalance balance = rentBalanceService.findOrCreateUnitBalance(
+                    unit.getId(), tenantId, unit.getPropertyId());
+
+            rentBalanceService.chargeElapsedMonthsIfNeeded(balance, unit.getRentAmount());
+            rentBalanceService.applyPayment(balance, rentPortion);
+
+            balanceAfter = balance.getBalance();
+            status = resolveStatus(balanceAfter);
+        } else {
+            // The entire payment went to the deposit — no rent portion to apply.
+            balanceAfter = rentBalanceService.getUnitBalance(unit.getId(), tenantId).getBalance();
+            status = PaymentStatus.PAID;
+        }
+
+        PaymentType paymentType = resolvePaymentType(depositApplied, rentPortion);
+
+        UnitRentPayment payment = new UnitRentPayment();
+        payment.setRentalUnitId(unit.getId());
+        payment.setTenantId(tenantId);
+        payment.setPropertyId(unit.getPropertyId());
+        payment.setAmount(amount);
+        payment.setPaymentMethod(PaymentMethod.WALLET);
+        payment.setPaymentReference(reference);
+        payment.setPaymentType(paymentType);
+        payment.setDepositAmountApplied(depositApplied);
+        payment.setRentAmountApplied(rentPortion.compareTo(BigDecimal.ZERO) > 0 ? rentPortion : BigDecimal.ZERO);
+        payment.setStatus(status);
+        payment.setResultingBalance(balanceAfter);
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setDescription(buildDescription(paymentType, depositApplied, status, balanceAfter));
+
+        return new UnitBooking(unitRentPaymentRepository.save(payment), status, balanceAfter);
     }
 
     private PaymentStatus resolveStatus(BigDecimal balanceAfter) {
@@ -268,31 +307,6 @@ public class UnitRentPaymentService {
         });
 
         return message.toString().trim();
-    }
-
-    /**
-     * Best-effort call to Wallet Service, mirroring LeaseRentUnitPaymentService's
-     * lease-based equivalent — failures are logged, never thrown. Runs on
-     * taskExecutor, off the request thread.
-     */
-    private void recordInWallet(UnitRentPayment payment) {
-        try {
-            RecordRentPaymentRequest walletRequest = RecordRentPaymentRequest.builder()
-                    .tenantId(payment.getTenantId())
-                    .leaseId(null)
-                    .propertyId(payment.getPropertyId())
-                    .amount(payment.getAmount())
-                    .paymentReference(payment.getId())
-                    .paymentMethod(payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : null)
-                    .paidAt(payment.getPaidAt())
-                    .description("Rent payment for rental unit " + payment.getRentalUnitId())
-                    .build();
-
-            walletServiceClient.recordRentPayment(walletRequest);
-        } catch (Exception e) {
-            log.error("Failed to record unit rent payment {} in wallet-service (tenantId={}, unitId={}): {}",
-                    payment.getId(), payment.getTenantId(), payment.getRentalUnitId(), e.getMessage());
-        }
     }
 
     /**
@@ -380,11 +394,9 @@ public class UnitRentPaymentService {
 
     /**
      * Human-readable "which property/unit is this about" fragment, used in
-     * both notification emails and SMS so a tenant on more than one unit
-     * can tell them apart at a glance. Falls back gracefully if the
-     * property lookup came back empty (e.g. record deleted since the
-     * payment was made) — never lets a missing lookup break the
-     * notification itself.
+     * the wallet transfer description and in notification emails/SMS so a
+     * tenant on more than one unit can tell them apart at a glance. Falls
+     * back gracefully if the property lookup came back empty.
      */
     private String locationSummary(RentalUnit unit, Property property) {
         String propertyName = (property != null && property.getTitle() != null && !property.getTitle().isBlank())
@@ -406,6 +418,7 @@ public class UnitRentPaymentService {
         response.setRentalUnitId(payment.getRentalUnitId());
         response.setAmount(payment.getAmount());
         response.setPaymentMethod(payment.getPaymentMethod());
+        response.setPaymentReference(payment.getPaymentReference());
         response.setPaymentType(payment.getPaymentType());
         response.setDepositAmountApplied(payment.getDepositAmountApplied());
         response.setRentAmountApplied(payment.getRentAmountApplied());
@@ -480,5 +493,8 @@ public class UnitRentPaymentService {
         response.setPostalCode(address.getPostalCode());
         response.setLandmark(address.getLandmark());
         return response;
+    }
+
+    private record UnitBooking(UnitRentPayment payment, PaymentStatus status, BigDecimal balanceAfter) {
     }
 }

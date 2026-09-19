@@ -30,6 +30,10 @@ public class UnitRentPayment {
     private BigDecimal amount;
     private PaymentMethod paymentMethod;
 
+    // wallet-service transfer reference (PRP-{tenantId}-...) — ties this payment
+    // to its wallet_transfers record and to wallet-service's own history.
+    private String paymentReference;
+
     private PaymentType paymentType = PaymentType.RENT;
     private BigDecimal depositAmountApplied = BigDecimal.ZERO;
     private BigDecimal rentAmountApplied = BigDecimal.ZERO;

@@ -1,8 +1,6 @@
 package com.premisave.property.service;
 
-import com.premisave.property.client.WalletServiceClient;
 import com.premisave.property.dto.request.LeaseRentPaymentRequest;
-import com.premisave.property.dto.request.RecordRentPaymentRequest;
 import com.premisave.property.dto.request.SecurityDepositRequest;
 import com.premisave.property.dto.response.LeaseRentPaymentResponse;
 import com.premisave.property.dto.response.LeaseSummaryResponse;
@@ -16,10 +14,15 @@ import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentSchedule;
 import com.premisave.property.entity.RentalUnit;
 import com.premisave.property.entity.Tenant;
+import com.premisave.property.entity.WalletTransfer;
+import com.premisave.property.enums.PaymentMethod;
 import com.premisave.property.enums.PaymentStatus;
 import com.premisave.property.enums.PaymentType;
+import com.premisave.property.enums.WalletTransferPurpose;
 import com.premisave.property.exception.BadRequestException;
+import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
+import com.premisave.property.exception.UnauthorizedException;
 import com.premisave.property.repository.LeaseRentUnitPaymentRepository;
 import com.premisave.property.repository.LeaseRepository;
 import com.premisave.property.repository.PropertyRepository;
@@ -51,6 +54,9 @@ public class LeaseRentUnitPaymentService {
     // schedule data is ever malformed (e.g. a zero-amount entry).
     private static final int MAX_SCHEDULES_TO_APPLY_PER_PAYMENT = 24;
 
+    private static final List<PaymentStatus> OUTSTANDING_STATUSES =
+            List.of(PaymentStatus.PENDING, PaymentStatus.PARTIALLY_PAID, PaymentStatus.OVERDUE);
+
     private final LeaseRentUnitPaymentRepository leaseRentUnitPaymentRepository;
     private final RentScheduleRepository rentScheduleRepository;
     private final LeaseRepository leaseRepository;
@@ -58,7 +64,7 @@ public class LeaseRentUnitPaymentService {
     private final PropertyRepository propertyRepository;
     private final SecurityDepositRepository securityDepositRepository;
     private final SecurityDepositService securityDepositService;
-    private final WalletServiceClient walletServiceClient;
+    private final WalletPaymentService walletPaymentService;
     private final TenantRepository tenantRepository;
     private final EmailService emailService;
     private final SmsService smsService;
@@ -67,17 +73,11 @@ public class LeaseRentUnitPaymentService {
     private final Executor taskExecutor;
 
     // ------------------------------------------------------------------
-    // TODO(WALLET-INTEGRATION):
-    // This service still assumes money has ALREADY been collected by the
-    // time recordPayment() is called — it books the transaction against rent
-    // schedules / deposits, then records it in Wallet Service for the
-    // tenant's statement history. It does NOT yet trigger a live checkout
-    // (M-Pesa STK Push / Stripe / PayPal) — that would mean a separate
-    // /initiate endpoint that calls wallet-service BEFORE recordPayment()
-    // runs, with recordPayment() only firing after a payment provider
-    // confirms success (webhook/callback or RabbitMQ event). Until then,
-    // this is a manual/confirmed-payment booking endpoint, not a live
-    // checkout flow.
+    // Payments are funded from the tenant's Premisave wallet: recordPayment()
+    // moves the money tenant wallet -> property owner's wallet through
+    // wallet-service (see WalletPaymentService) and only then books it
+    // against the deposit / rent schedules. Wallets are topped up in
+    // wallet-service (M-Pesa STK, Stripe, PayPal, ...), not here.
     // ------------------------------------------------------------------
 
     public PaymentDueResponse getPaymentDue(String leaseId) {
@@ -99,8 +99,7 @@ public class LeaseRentUnitPaymentService {
         }
 
         BigDecimal rentDue = rentScheduleRepository
-                .findFirstByLeaseIdAndStatusInOrderByDueDateAsc(leaseId,
-                        List.of(PaymentStatus.PENDING, PaymentStatus.PARTIALLY_PAID, PaymentStatus.OVERDUE))
+                .findFirstByLeaseIdAndStatusInOrderByDueDateAsc(leaseId, OUTSTANDING_STATUSES)
                 .map(s -> s.getAmountDue().subtract(s.getAmountPaid()))
                 .orElse(BigDecimal.ZERO);
 
@@ -137,8 +136,29 @@ public class LeaseRentUnitPaymentService {
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Payment amount must be greater than zero");
         }
+        walletPaymentService.assertWalletPaymentMethod(request.getPaymentMethod());
+
+        String reference = walletPaymentService.resolveReference(tenantId, request.getReference());
+
+        // Idempotent replay: this reference was already paid and booked — return that payment,
+        // don't touch the wallet or the rent schedule again.
+        Optional<LeaseRentUnitPayment> replay = leaseRentUnitPaymentRepository.findByPaymentReference(reference);
+        if (replay.isPresent()) {
+            LeaseRentUnitPayment existing = replay.get();
+            boolean sameRequest = request.getLeaseId().equals(existing.getLeaseId())
+                    && tenantId.equals(existing.getTenantId())
+                    && request.getAmount().compareTo(existing.getAmount()) == 0;
+            if (!sameRequest) {
+                throw new ConflictException("This payment reference was already used for a different payment");
+            }
+            return toResponse(existing);
+        }
 
         Lease lease = findLeaseOrThrow(request.getLeaseId());
+
+        if (!tenantId.equals(lease.getTenantId())) {
+            throw new UnauthorizedException("You can only pay rent on your own lease");
+        }
 
         boolean depositRequired;
         BigDecimal depositAmount;
@@ -153,58 +173,52 @@ public class LeaseRentUnitPaymentService {
             depositRequired = depositAmount != null && depositAmount.compareTo(BigDecimal.ZERO) > 0;
         }
 
-        BigDecimal remaining = request.getAmount();
-        BigDecimal depositApplied = BigDecimal.ZERO;
-
+        // ---- Validate everything BEFORE any money moves ----------------------------------------
         boolean depositAlreadyHeld = securityDepositRepository.findByLeaseId(lease.getId()).isPresent();
 
+        BigDecimal depositToApply = BigDecimal.ZERO;
         if (depositRequired && !depositAlreadyHeld
                 && depositAmount != null
                 && depositAmount.compareTo(BigDecimal.ZERO) > 0) {
 
-            if (remaining.compareTo(depositAmount) < 0) {
+            if (request.getAmount().compareTo(depositAmount) < 0) {
                 throw new BadRequestException(
-                        "Payment of " + remaining + " is less than the required security deposit of "
+                        "Payment of " + request.getAmount() + " is less than the required security deposit of "
                                 + depositAmount + ". Deposit must be settled before or alongside rent.");
             }
-
-            SecurityDepositRequest depositRequest = new SecurityDepositRequest();
-            depositRequest.setLeaseId(lease.getId());
-            depositRequest.setAmount(depositAmount);
-            securityDepositService.holdDeposit(depositRequest);
-
-            depositApplied = depositAmount;
-            remaining = remaining.subtract(depositAmount);
+            depositToApply = depositAmount;
         }
 
-        RentApplicationResult rentResult = applyRentAcrossSchedules(request.getLeaseId(), remaining);
+        BigDecimal rentPortion = request.getAmount().subtract(depositToApply);
 
-        LeaseRentUnitPayment payment = new LeaseRentUnitPayment();
-        payment.setLeaseId(request.getLeaseId());
-        payment.setTenantId(tenantId);
-        payment.setAmount(request.getAmount());
-        payment.setAmountPaid(request.getAmount());
-        payment.setDepositAmountApplied(depositApplied);
-        payment.setRentAmountApplied(rentResult.totalRentApplied());
-        PaymentType paymentType = resolvePaymentType(depositApplied, rentResult.totalRentApplied());
-        payment.setPaymentType(paymentType);
-        payment.setPaymentMethod(request.getPaymentMethod());
-        payment.setStatus(deriveTransactionStatus(rentResult));
-        payment.setPaidAt(LocalDateTime.now());
-        payment.setDescription(buildPaymentDescription(paymentType, depositApplied, rentResult));
+        if (rentPortion.compareTo(BigDecimal.ZERO) > 0
+                && rentScheduleRepository
+                        .findFirstByLeaseIdAndStatusInOrderByDueDateAsc(lease.getId(), OUTSTANDING_STATUSES)
+                        .isEmpty()) {
+            throw new ResourceNotFoundException("No outstanding rent due for this lease");
+        }
 
-        LeaseRentUnitPayment saved = leaseRentUnitPaymentRepository.save(payment);
-
-        // Record the payment in Wallet Service for the tenant's transaction
-        // history. Deliberately NOT part of the DB transaction above — a
-        // wallet-service hiccup must never roll back or fail a rent payment
-        // that has already been booked against the lease's rent schedule.
-        recordInWallet(saved, lease.getPropertyId());
-
-        // Fetched once here (not inside the async notification methods) so
-        // both notifications below reuse the same lookup instead of hitting
-        // Mongo twice for the same property.
+        // Fetched once here so the description and both notifications below reuse the same lookup.
         Property property = propertyRepository.findById(lease.getPropertyId()).orElse(null);
+
+        // ---- Move the money: tenant wallet -> property owner's wallet --------------------------
+        WalletTransfer transfer = walletPaymentService.collect(new WalletPaymentService.CollectionCommand(
+                reference, tenantId, lease.getPropertyId(), WalletTransferPurpose.LEASE_RENT, lease.getId(),
+                request.getAmount(), "Rent payment for " + locationSummary(unit, property)));
+
+        // ---- Book it ---------------------------------------------------------------------------
+        LeaseBooking booking;
+        try {
+            booking = bookLeasePayment(lease.getId(), tenantId, request.getAmount(), transfer.getReference(),
+                    depositToApply, rentPortion);
+        } catch (RuntimeException e) {
+            throw walletPaymentService.bookingFailed(transfer, e);
+        }
+
+        LeaseRentUnitPayment saved = booking.payment();
+        RentApplicationResult rentResult = booking.rentResult();
+        walletPaymentService.markBooked(transfer.getReference(), saved.getId());
+
         RentalUnit notificationUnit = unit;
 
         // Best-effort payment confirmation — fires for every successful
@@ -215,11 +229,8 @@ public class LeaseRentUnitPaymentService {
 
         // Best-effort tenant notification — only when the payment spilled
         // into a future billing period or ended up as a pure credit (no
-        // more schedule entries left to apply it to). An ordinary
-        // exact/partial payment against the current period stays silent
-        // on THIS notice (it still gets the confirmation above).
-        // Dispatched via taskExecutor rather than called inline, so the
-        // email/SMS round-trip doesn't add latency to the payment response.
+        // more schedule entries left to apply it to). Dispatched via
+        // taskExecutor so the email/SMS round-trip doesn't add latency.
         if (rentResult.spilloverOccurred()) {
             taskExecutor.execute(() ->
                     notifyTenantOfOverpayment(tenantId, lease, notificationUnit, property, rentResult));
@@ -232,6 +243,42 @@ public class LeaseRentUnitPaymentService {
         return leaseRentUnitPaymentRepository.findByLeaseId(leaseId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * Local booking once the money has moved: hold the deposit portion, apply the
+     * rent portion across schedule entries, and save the payment record.
+     */
+    private LeaseBooking bookLeasePayment(String leaseId, String tenantId, BigDecimal amount, String reference,
+                                           BigDecimal depositToApply, BigDecimal rentPortion) {
+        BigDecimal depositApplied = BigDecimal.ZERO;
+
+        if (depositToApply.compareTo(BigDecimal.ZERO) > 0) {
+            SecurityDepositRequest depositRequest = new SecurityDepositRequest();
+            depositRequest.setLeaseId(leaseId);
+            depositRequest.setAmount(depositToApply);
+            securityDepositService.holdDeposit(depositRequest);
+            depositApplied = depositToApply;
+        }
+
+        RentApplicationResult rentResult = applyRentAcrossSchedules(leaseId, rentPortion);
+
+        LeaseRentUnitPayment payment = new LeaseRentUnitPayment();
+        payment.setLeaseId(leaseId);
+        payment.setTenantId(tenantId);
+        payment.setAmount(amount);
+        payment.setAmountPaid(amount);
+        payment.setDepositAmountApplied(depositApplied);
+        payment.setRentAmountApplied(rentResult.totalRentApplied());
+        PaymentType paymentType = resolvePaymentType(depositApplied, rentResult.totalRentApplied());
+        payment.setPaymentType(paymentType);
+        payment.setPaymentMethod(PaymentMethod.WALLET);
+        payment.setPaymentReference(reference);
+        payment.setStatus(deriveTransactionStatus(rentResult));
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setDescription(buildPaymentDescription(paymentType, depositApplied, rentResult));
+
+        return new LeaseBooking(leaseRentUnitPaymentRepository.save(payment), rentResult);
     }
 
     // ------------------------------------------------------------------
@@ -272,8 +319,7 @@ public class LeaseRentUnitPaymentService {
             }
 
             Optional<RentSchedule> nextScheduleOpt = rentScheduleRepository
-                    .findFirstByLeaseIdAndStatusInOrderByDueDateAsc(leaseId,
-                            List.of(PaymentStatus.PENDING, PaymentStatus.PARTIALLY_PAID, PaymentStatus.OVERDUE));
+                    .findFirstByLeaseIdAndStatusInOrderByDueDateAsc(leaseId, OUTSTANDING_STATUSES);
 
             if (nextScheduleOpt.isEmpty()) {
                 break; // nothing left to apply to — handled below
@@ -329,33 +375,6 @@ public class LeaseRentUnitPaymentService {
         boolean spilloverOccurred = applications.size() > 1 || finalStatus == PaymentStatus.OVERPAID;
 
         return new RentApplicationResult(totalApplied, finalStatus, applications, spilloverOccurred, finalOverpaidAmount);
-    }
-
-    /**
-     * Best-effort call to Wallet Service. Failures are logged, not thrown —
-     * the LeaseRentUnitPayment row saved above is the source of truth for the
-     * payment. TODO: once Wallet Service exposes a reconciliation/replay
-     * endpoint, failed attempts here should be queued for retry instead of
-     * only logged.
-     */
-    private void recordInWallet(LeaseRentUnitPayment payment, String propertyId) {
-        try {
-            RecordRentPaymentRequest walletRequest = RecordRentPaymentRequest.builder()
-                    .tenantId(payment.getTenantId())
-                    .leaseId(payment.getLeaseId())
-                    .propertyId(propertyId)
-                    .amount(payment.getAmountPaid())
-                    .paymentReference(payment.getId())
-                    .paymentMethod(payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : null)
-                    .paidAt(payment.getPaidAt())
-                    .description("Rent payment for lease " + payment.getLeaseId())
-                    .build();
-
-            walletServiceClient.recordRentPayment(walletRequest);
-        } catch (Exception e) {
-            log.error("Failed to record rent payment {} in wallet-service (tenantId={}, leaseId={}): {}",
-                    payment.getId(), payment.getTenantId(), payment.getLeaseId(), e.getMessage());
-        }
     }
 
     /**
@@ -462,11 +481,9 @@ public class LeaseRentUnitPaymentService {
 
     /**
      * Human-readable "which property/unit is this about" fragment, used in
-     * both notification emails and SMS so a tenant on more than one
-     * lease/unit can tell them apart at a glance. Falls back gracefully if
-     * property or unit lookups came back empty (e.g. record deleted since
-     * the payment was made) — never lets a missing lookup break the
-     * notification itself.
+     * the wallet transfer description and in notification emails/SMS so a
+     * tenant on more than one lease/unit can tell them apart at a glance.
+     * Falls back gracefully if property or unit lookups came back empty.
      */
     private String locationSummary(RentalUnit unit, Property property) {
         String propertyName = (property != null && property.getTitle() != null && !property.getTitle().isBlank())
@@ -485,7 +502,7 @@ public class LeaseRentUnitPaymentService {
         if (hasDeposit) return PaymentType.SECURITY_DEPOSIT;
         return PaymentType.RENT;
     }
-    
+
     /**
      * The transaction-level outcome, as the payer experienced it — distinct
      * from the status of whichever schedule entry the loop happened to
@@ -508,7 +525,6 @@ public class LeaseRentUnitPaymentService {
         }
         return rentResult.finalStatus();
     }
-    
 
     /**
      * Builds a plain-language, point-in-time summary of what this specific
@@ -595,6 +611,7 @@ public class LeaseRentUnitPaymentService {
         response.setDepositAmountApplied(payment.getDepositAmountApplied());
         response.setStatus(payment.getStatus().name());
         response.setPaymentMethod(payment.getPaymentMethod());
+        response.setPaymentReference(payment.getPaymentReference());
         response.setPaidAt(payment.getPaidAt());
         response.setDescription(payment.getDescription());
 
@@ -681,7 +698,7 @@ public class LeaseRentUnitPaymentService {
     }
 
     // ------------------------------------------------------------------
-    // Internal result types for schedule application
+    // Internal result types
     // ------------------------------------------------------------------
 
     private record ScheduleApplication(LocalDate dueDate, BigDecimal amountApplied, PaymentStatus resultingStatus) {
@@ -693,5 +710,8 @@ public class LeaseRentUnitPaymentService {
             List<ScheduleApplication> applications,
             boolean spilloverOccurred,
             BigDecimal finalOverpaidAmount) {
+    }
+
+    private record LeaseBooking(LeaseRentUnitPayment payment, RentApplicationResult rentResult) {
     }
 }

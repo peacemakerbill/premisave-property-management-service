@@ -4,7 +4,9 @@ import com.premisave.property.dto.request.GenerateBillFromReadingRequest;
 import com.premisave.property.dto.request.PayUtilityBillRequest;
 import com.premisave.property.dto.request.UtilityBillRequest;
 import com.premisave.property.dto.response.UtilityBillResponse;
+import com.premisave.property.service.TenantService;
 import com.premisave.property.service.UtilityBillingService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,7 @@ import java.util.List;
 public class UtilityBillController {
 
     private final UtilityBillingService utilityBillingService;
+    private final TenantService tenantService;
 
     @PostMapping
     public ResponseEntity<UtilityBillResponse> generateBill(@Valid @RequestBody UtilityBillRequest request) {
@@ -30,11 +33,13 @@ public class UtilityBillController {
         return ResponseEntity.ok(utilityBillingService.generateBillFromReading(request));
     }
 
-    // TODO(WALLET-INTEGRATION): same as rent payment — this books a payment as
-    // already collected. Should route through the wallet service once connected.
+    // Paid from the calling tenant's wallet — the tenant comes from the JWT,
+    // never from the request body.
     @PostMapping("/pay")
-    public ResponseEntity<UtilityBillResponse> payBill(@Valid @RequestBody PayUtilityBillRequest request) {
-        return ResponseEntity.ok(utilityBillingService.payBill(request));
+    public ResponseEntity<UtilityBillResponse> payBill(@Valid @RequestBody PayUtilityBillRequest request,
+                                                         HttpServletRequest httpRequest) {
+        String tenantId = resolveTenantId(httpRequest);
+        return ResponseEntity.ok(utilityBillingService.payBill(request, tenantId));
     }
 
     @GetMapping("/{id}")
@@ -55,5 +60,10 @@ public class UtilityBillController {
     @GetMapping("/tenant/{tenantId}/outstanding")
     public ResponseEntity<List<UtilityBillResponse>> getOutstandingBillsByTenant(@PathVariable String tenantId) {
         return ResponseEntity.ok(utilityBillingService.getOutstandingBillsByTenant(tenantId));
+    }
+
+    private String resolveTenantId(HttpServletRequest httpRequest) {
+        String userId = (String) httpRequest.getAttribute("userId");
+        return tenantService.getTenantByUserId(userId).getId();
     }
 }

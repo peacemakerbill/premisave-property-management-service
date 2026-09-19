@@ -8,6 +8,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @Document(collection = "utility_bills")
@@ -31,6 +33,11 @@ public class UtilityBill {
     private String sourceMeterReadingId;
 
     private PaymentStatus status = PaymentStatus.PENDING;
+
+    // wallet-service transfer references of every payment applied to this bill.
+    // A bill can take several partial payments; a retried payment whose
+    // reference is already here is recognised and not applied twice.
+    private List<String> paymentReferences = new ArrayList<>();
 
     @CreatedDate
     private LocalDateTime createdAt;
