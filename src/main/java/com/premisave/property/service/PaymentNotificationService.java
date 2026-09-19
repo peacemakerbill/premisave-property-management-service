@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Sends the emails (and short SMS) for everything money-related: rent payments,
+ * Sends the emails for everything money-related: rent payments,
  * security deposits, utility bills and failed payments.
  *
  * Every public method is @Async on the shared "taskExecutor" pool, so callers return
@@ -43,7 +43,6 @@ public class PaymentNotificationService {
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a", Locale.ENGLISH);
 
     private final EmailService emailService;
-    private final SmsService smsService;
     private final TenantRepository tenantRepository;
     private final OwnerRepository ownerRepository;
 
@@ -111,15 +110,7 @@ public class PaymentNotificationService {
                 boolean emailSent = emailService.send(tenant.getEmail(),
                         "Payment received — " + MoneyUtils.format(r.amount()), tenantReceipt(tenant, r, location));
 
-                String sms = "Premisave: payment of " + MoneyUtils.format(r.amount()) + " received for " + location + ".";
-                if (positive(r.creditAmount())) {
-                    sms += " " + MoneyUtils.format(r.creditAmount()) + " is held as credit.";
-                } else if (positive(r.outstandingBalance())) {
-                    sms += " " + MoneyUtils.format(r.outstandingBalance()) + " still outstanding.";
-                }
-                boolean smsSent = smsService.sendNoticeSms(tenant.getPhoneNumber(), sms);
-
-                log.info("Rent receipt for {} sent (emailSent={}, smsSent={})", r.reference(), emailSent, smsSent);
+                log.info("Rent receipt for {} sent (emailSent={})", r.reference(), emailSent);
             }
 
             notifyOwner(r.ownerId(), r.ownerEmail(), "Rent received — " + MoneyUtils.format(r.amount()),
@@ -300,11 +291,7 @@ public class PaymentNotificationService {
                             .footnote("Bill reference: " + n.billId())
                             .build());
 
-            boolean smsSent = smsService.sendNoticeSms(tenant.getPhoneNumber(),
-                    "Premisave: new " + utility.toLowerCase() + " bill of " + MoneyUtils.format(n.amount())
-                            + " for " + location + ". Pay it from your wallet.");
-
-            log.info("Utility bill notice for bill {} sent (emailSent={}, smsSent={})", n.billId(), emailSent, smsSent);
+            log.info("Utility bill notice for bill {} sent (emailSent={})", n.billId(), emailSent);
         } catch (Exception e) {
             log.error("Failed to send utility bill notice for bill {}: {}", n.billId(), e.getMessage());
         }
@@ -323,11 +310,7 @@ public class PaymentNotificationService {
                 boolean emailSent = emailService.send(tenant.getEmail(),
                         "Utility payment received — " + MoneyUtils.format(r.amountPaid()),
                         utilityTenantReceipt(tenant, r, location, utility));
-                boolean smsSent = smsService.sendNoticeSms(tenant.getPhoneNumber(),
-                        "Premisave: payment of " + MoneyUtils.format(r.amountPaid()) + " received for your "
-                                + utility.toLowerCase() + " bill (" + location + ")."
-                                + (positive(r.balanceDue()) ? " " + MoneyUtils.format(r.balanceDue()) + " still due." : ""));
-                log.info("Utility payment receipt for {} sent (emailSent={}, smsSent={})", r.reference(), emailSent, smsSent);
+                log.info("Utility payment receipt for {} sent (emailSent={})", r.reference(), emailSent);
             }
 
             notifyOwner(r.ownerId(), r.ownerEmail(), "Utility payment received — " + MoneyUtils.format(r.amountPaid()),
@@ -449,10 +432,7 @@ public class PaymentNotificationService {
                     .build();
 
             boolean emailSent = emailService.send(tenant.getEmail(), "Payment unsuccessful — " + MoneyUtils.format(amount), content);
-            boolean smsSent = smsService.sendNoticeSms(tenant.getPhoneNumber(),
-                    "Premisave: your payment of " + MoneyUtils.format(amount) + " was not completed. " + why
-                            + " No money was taken.");
-            log.info("Failed-payment notice for tenant {} sent (emailSent={}, smsSent={})", tenantId, emailSent, smsSent);
+            log.info("Failed-payment notice for tenant {} sent (emailSent={})", tenantId, emailSent);
         } catch (Exception e) {
             log.error("Failed to send failed-payment notice to tenant {}: {}", tenantId, e.getMessage());
         }
@@ -499,10 +479,7 @@ public class PaymentNotificationService {
                     .build();
 
             boolean emailSent = emailService.send(tenant.getEmail(), "Security deposit received — " + MoneyUtils.format(d.amount()), content);
-            boolean smsSent = smsService.sendNoticeSms(tenant.getPhoneNumber(),
-                    "Premisave: your security deposit of " + MoneyUtils.format(d.amount()) + " for " + location
-                            + " has been recorded and held.");
-            log.info("Deposit-held notice for tenant {} sent (emailSent={}, smsSent={})", d.tenantId(), emailSent, smsSent);
+            log.info("Deposit-held notice for tenant {} sent (emailSent={})", d.tenantId(), emailSent);
         } catch (Exception e) {
             log.error("Failed to send deposit-held notice to tenant {}: {}", d.tenantId(), e.getMessage());
         }
@@ -559,12 +536,7 @@ public class PaymentNotificationService {
                             + MoneyUtils.format(d.refundedNow()),
                     builder.ctaLabel("View my deposit").ctaUrl(appUrl).build());
 
-            String sms = "Premisave: " + MoneyUtils.format(d.refundedNow()) + " refunded from your deposit (" + location + ").";
-            if (!d.finalRefund()) {
-                sms += " Remaining: " + MoneyUtils.format(d.remaining()) + ".";
-            }
-            boolean smsSent = smsService.sendNoticeSms(tenant.getPhoneNumber(), sms);
-            log.info("Deposit-refund notice for tenant {} sent (emailSent={}, smsSent={})", d.tenantId(), emailSent, smsSent);
+            log.info("Deposit-refund notice for tenant {} sent (emailSent={})", d.tenantId(), emailSent);
         } catch (Exception e) {
             log.error("Failed to send deposit-refund notice to tenant {}: {}", d.tenantId(), e.getMessage());
         }

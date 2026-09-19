@@ -65,27 +65,6 @@
       "defaultValue": "support@premisave.com"
     },
     {
-      "name": "twilio.account-sid",
-      "type": "java.lang.String",
-      "description": "Twilio Account SID, used to initialize the Twilio SDK (TwilioConfig) and authenticate SMS delivery (SmsService): notices, payment receipts, deposit and utility bill alerts. If blank, SMS sending is skipped rather than failing."
-    },
-    {
-      "name": "twilio.auth-token",
-      "type": "java.lang.String",
-      "description": "Twilio Auth Token, used alongside twilio.account-sid to initialize the Twilio SDK (TwilioConfig). If blank, SMS sending is skipped rather than failing."
-    },
-    {
-      "name": "twilio.from-number",
-      "type": "java.lang.String",
-      "description": "Twilio phone number (E.164 format) that SMS messages are sent from (SmsService). If blank, SMS sending is skipped rather than failing."
-    },
-    {
-      "name": "twilio.default-country-code",
-      "type": "java.lang.String",
-      "description": "Country code prepended to tenant/owner phone numbers that aren't already in E.164 format before sending via Twilio (SmsService).",
-      "defaultValue": "+254"
-    },
-    {
       "name": "utility.rates",
       "type": "java.util.Map<com.premisave.property.enums.UtilityType,java.math.BigDecimal>",
       "description": "Utility rates in USD charged per unit of metered consumption, keyed by utility type (e.g. utility.rates.electricity, utility.rates.water). Used to auto-generate bills from meter readings (UtilityBillingService). Utility types with no rate need an explicit ratePerUnit on the request."

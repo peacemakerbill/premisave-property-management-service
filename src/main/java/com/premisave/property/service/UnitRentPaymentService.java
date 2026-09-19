@@ -50,7 +50,7 @@ public class UnitRentPaymentService {
     private final WalletPaymentService walletPaymentService;
 
     // Receipts/notifications run asynchronously inside this service (@Async on the
-    // shared "taskExecutor" pool), so the request thread never waits on SMTP/SMS.
+    // shared "taskExecutor" pool), so the request thread never waits on SMTP.
     private final PaymentNotificationService paymentNotificationService;
 
     public UnitRentPaymentService(RentalUnitRepository rentalUnitRepository,
@@ -186,7 +186,7 @@ public class UnitRentPaymentService {
         UnitRentPayment saved = booking.payment();
         walletPaymentService.markBooked(transfer.getReference(), saved.getId());
 
-        // Best-effort, asynchronous: tenant receipt (email + SMS) and an email to the property owner
+        // Best-effort, asynchronous: tenant receipt email and an email to the property owner
         // whose wallet was credited. Never affects the payment that is already booked.
         BigDecimal balanceAfter = booking.balanceAfter();
         paymentNotificationService.notifyRentPaid(new PaymentNotificationService.RentReceipt(

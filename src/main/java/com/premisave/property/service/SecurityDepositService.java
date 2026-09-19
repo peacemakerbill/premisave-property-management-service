@@ -47,8 +47,8 @@ public class SecurityDepositService {
     private final PropertyRepository propertyRepository;
     private final RentalUnitRepository rentalUnitRepository;
 
-    // Emails/SMS are sent asynchronously inside this service (@Async on the shared
-    // "taskExecutor" pool), so nothing here waits on SMTP/SMS.
+    // Emails are sent asynchronously inside this service (@Async on the shared
+    // "taskExecutor" pool), so nothing here waits on SMTP.
     private final PaymentNotificationService notificationService;
 
     @Transactional
@@ -115,7 +115,7 @@ public class SecurityDepositService {
      * every refund issued so far can never exceed the original deposit
      * amount. A reason is required whenever the refund is partial (i.e.
      * doesn't bring the balance to zero); it's optional on a final refund
-     * that fully closes the deposit out. Fires a best-effort email + SMS to
+     * that fully closes the deposit out. Fires a best-effort email to
      * the tenant once the refund is recorded.
      */
     @Transactional

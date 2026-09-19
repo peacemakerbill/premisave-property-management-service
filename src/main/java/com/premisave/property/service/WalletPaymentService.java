@@ -372,7 +372,7 @@ public class WalletPaymentService {
         return outcomeUnknown(transfer, e);
     }
 
-    /** Tells the tenant (email + SMS, async) that wallet-service rejected the payment and nothing moved. */
+    /** Tells the tenant (email, async) that wallet-service rejected the payment and nothing moved. */
     private void notifyRejected(WalletTransfer transfer, String reason) {
         paymentNotificationService.notifyPaymentFailed(transfer.getTenantId(), transfer.getDescription(),
                 transfer.getAmount(), reason, clientFacingReference(transfer.getReference()));

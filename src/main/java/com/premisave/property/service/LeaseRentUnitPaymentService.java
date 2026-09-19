@@ -215,7 +215,7 @@ public class LeaseRentUnitPaymentService {
         RentApplicationResult rentResult = booking.rentResult();
         walletPaymentService.markBooked(transfer.getReference(), saved.getId());
 
-        // Best-effort, asynchronous: tenant receipt (email + SMS) and an email to the property owner
+        // Best-effort, asynchronous: tenant receipt email and an email to the property owner
         // whose wallet was credited. Never affects the payment that is already booked.
         paymentNotificationService.notifyRentPaid(new PaymentNotificationService.RentReceipt(
                 tenantId, transfer.getOwnerId(), transfer.getRecipientAccount(),

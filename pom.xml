@@ -110,13 +110,6 @@
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
 
-        <!-- Twilio (SMS notice delivery) -->
-        <dependency>
-            <groupId>com.twilio.sdk</groupId>
-            <artifactId>twilio</artifactId>
-            <version>10.7.2</version>
-        </dependency>
-
         <!-- Dotenv Support - NEW -->
         <dependency>
             <groupId>io.github.cdimascio</groupId>

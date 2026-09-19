@@ -42,7 +42,6 @@ public class NoticeSchedulingService {
     private final PropertyRepository propertyRepository;
     private final NoticeService noticeService;
     private final EmailService emailService;
-    private final SmsService smsService;
 
     // ------------------------------------------------------------------
     // Entry point: create a job, send instantly or leave PENDING for the
@@ -58,6 +57,10 @@ public class NoticeSchedulingService {
 
         if (unitIds.isEmpty() && leaseIds.isEmpty()) {
             throw new BadRequestException("Provide at least one rentalUnitId or leaseId to notify");
+        }
+
+        if (request.getChannels() != null && request.getChannels().contains(NotificationChannel.SMS)) {
+            throw new BadRequestException("SMS notices aren't available. Choose EMAIL as the delivery channel.");
         }
 
         assertOwnership(unitIds, leaseIds, ownerId);
@@ -194,12 +197,6 @@ public class NoticeSchedulingService {
             String tenantName = notice.getTenant() != null ? notice.getTenant().getFullName() : null;
             result.setEmailSent(emailService.sendNoticeEmail(
                     email, tenantName, notice.getTitle(), notice.getNoticeType().name(), notice.getContent()));
-        }
-
-        if (channels.contains(NotificationChannel.SMS)) {
-            result.setSmsRequested(true);
-            String phone = notice.getTenant() != null ? notice.getTenant().getPhoneNumber() : null;
-            result.setSmsSent(smsService.sendNoticeSms(phone, notice.getTitle() + ": " + notice.getContent()));
         }
     }
 

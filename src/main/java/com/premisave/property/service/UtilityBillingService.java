@@ -252,7 +252,7 @@ public class UtilityBillingService {
 
     // ------------------------------------------------------------------
 
-    /** Tells the tenant a new bill was issued (email + SMS, async). Never throws. */
+    /** Tells the tenant a new bill was issued (email, async). Never throws. */
     private void notifyBillIssued(UtilityBill bill, MeterReading reading, BigDecimal ratePerUnit) {
         try {
             RentalUnit unit = bill.getRentalUnitId() != null
