@@ -20,7 +20,7 @@
     {
       "name": "wallet-service.url",
       "type": "java.lang.String",
-      "description": "Base URL of the wallet-service, used for Feign client calls.",
+      "description": "Base URL of the wallet-service. WalletServiceClient calls POST /internal/transfer on it to move rent and utility payments from the tenant's wallet to the property owner's wallet.",
       "defaultValue": "http://localhost:8084"
     },
     {
@@ -38,24 +38,36 @@
     {
       "name": "app.api-key",
       "type": "java.lang.String",
-      "description": "Internal API key used to authenticate service-to-service calls (X-API-Key header). Must match the value configured in auth-service."
+      "description": "Internal API key sent as the X-API-Key header on service-to-service calls: to wallet-service /internal/** endpoints (WalletServiceFeignConfig) and to auth-service internal lookups. Must match auth-service's key and wallet-service's internal.api-key (INTERNAL_API_KEY). No default: if it is blank, those calls are rejected with 401."
     },
     {
       "name": "frontend.url",
       "type": "java.lang.String",
-      "description": "Base URL of the frontend application, used when building links (e.g. activation, reset-password) sent back to clients.",
+      "description": "Base URL of the frontend application. Used as the button link (e.g. 'Open Premisave', 'Pay this bill') in the emails sent by EmailService and PaymentNotificationService.",
       "defaultValue": "http://localhost:3000"
     },
     {
       "name": "notifications.email.from",
       "type": "java.lang.String",
-      "description": "Display 'From' address used when sending notice emails (EmailService). Independent of the SMTP login configured under spring.mail.username.",
+      "description": "Address emails are sent from (EmailService): payment receipts, deposit and utility bill emails, failed-payment notices and owner-written notices. Independent of the SMTP login configured under spring.mail.username.",
       "defaultValue": "no-reply@premisave.com"
+    },
+    {
+      "name": "notifications.email.from-name",
+      "type": "java.lang.String",
+      "description": "Display name shown on the email From line and in the header and footer of every email (EmailService).",
+      "defaultValue": "Premisave"
+    },
+    {
+      "name": "notifications.email.support-address",
+      "type": "java.lang.String",
+      "description": "Support contact shown as a mailto link in the footer of every email (EmailService).",
+      "defaultValue": "support@premisave.com"
     },
     {
       "name": "twilio.account-sid",
       "type": "java.lang.String",
-      "description": "Twilio Account SID, used to initialize the Twilio SDK (TwilioConfig) and authenticate SMS notice delivery (SmsService). If blank, SMS sending is skipped rather than failing."
+      "description": "Twilio Account SID, used to initialize the Twilio SDK (TwilioConfig) and authenticate SMS delivery (SmsService): notices, payment receipts, deposit and utility bill alerts. If blank, SMS sending is skipped rather than failing."
     },
     {
       "name": "twilio.auth-token",
@@ -65,13 +77,18 @@
     {
       "name": "twilio.from-number",
       "type": "java.lang.String",
-      "description": "Twilio phone number (E.164 format) that notice SMS messages are sent from (SmsService). If blank, SMS sending is skipped rather than failing."
+      "description": "Twilio phone number (E.164 format) that SMS messages are sent from (SmsService). If blank, SMS sending is skipped rather than failing."
     },
     {
       "name": "twilio.default-country-code",
       "type": "java.lang.String",
       "description": "Country code prepended to tenant/owner phone numbers that aren't already in E.164 format before sending via Twilio (SmsService).",
       "defaultValue": "+254"
+    },
+    {
+      "name": "utility.rates",
+      "type": "java.util.Map<com.premisave.property.enums.UtilityType,java.math.BigDecimal>",
+      "description": "Utility rates in USD charged per unit of metered consumption, keyed by utility type (e.g. utility.rates.electricity, utility.rates.water). Used to auto-generate bills from meter readings (UtilityBillingService). Utility types with no rate need an explicit ratePerUnit on the request."
     }
   ]
 }

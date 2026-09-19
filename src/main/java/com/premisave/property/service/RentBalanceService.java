@@ -21,6 +21,7 @@ import com.premisave.property.repository.RentBalanceRepository;
 import com.premisave.property.repository.RentScheduleRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.TenantRepository;
+import com.premisave.property.util.MoneyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -248,9 +249,9 @@ public class RentBalanceService {
         if (balance.compareTo(BigDecimal.ZERO) == 0) {
             message = "Fully settled — no arrears, no credit on file.";
         } else if (balance.compareTo(BigDecimal.ZERO) > 0) {
-            message = "KES " + arrearsOwed + " in arrears.";
+            message = MoneyUtils.format(arrearsOwed) + " in arrears.";
         } else {
-            message = "KES " + creditAvailable + " in credit — will be applied automatically to future rent.";
+            message = MoneyUtils.format(creditAvailable) + " in credit — will be applied automatically to future rent.";
         }
 
         RentBalanceResponse response = new RentBalanceResponse();

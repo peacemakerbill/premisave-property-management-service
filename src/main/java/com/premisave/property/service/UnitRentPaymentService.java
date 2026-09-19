@@ -26,8 +26,8 @@ import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.TenantRepository;
 import com.premisave.property.repository.UnitRentPaymentRepository;
+import com.premisave.property.util.MoneyUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +35,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
@@ -49,13 +48,10 @@ public class UnitRentPaymentService {
     private final RentBalanceService rentBalanceService;
     private final SecurityDepositService securityDepositService;
     private final WalletPaymentService walletPaymentService;
-    private final EmailService emailService;
-    private final SmsService smsService;
 
-    // Post-payment notifications (which include a synchronous SMTP send via
-    // EmailService) run here instead of on the request thread. Reuses the
-    // project's existing "taskExecutor" bean (see AsyncConfig).
-    private final Executor taskExecutor;
+    // Receipts/notifications run asynchronously inside this service (@Async on the
+    // shared "taskExecutor" pool), so the request thread never waits on SMTP/SMS.
+    private final PaymentNotificationService paymentNotificationService;
 
     public UnitRentPaymentService(RentalUnitRepository rentalUnitRepository,
                                    OccupancyHistoryRepository occupancyHistoryRepository,
@@ -65,9 +61,7 @@ public class UnitRentPaymentService {
                                    RentBalanceService rentBalanceService,
                                    SecurityDepositService securityDepositService,
                                    WalletPaymentService walletPaymentService,
-                                   EmailService emailService,
-                                   SmsService smsService,
-                                   @Qualifier("taskExecutor") Executor taskExecutor) {
+                                   PaymentNotificationService paymentNotificationService) {
         this.rentalUnitRepository = rentalUnitRepository;
         this.occupancyHistoryRepository = occupancyHistoryRepository;
         this.unitRentPaymentRepository = unitRentPaymentRepository;
@@ -76,9 +70,7 @@ public class UnitRentPaymentService {
         this.rentBalanceService = rentBalanceService;
         this.securityDepositService = securityDepositService;
         this.walletPaymentService = walletPaymentService;
-        this.emailService = emailService;
-        this.smsService = smsService;
-        this.taskExecutor = taskExecutor;
+        this.paymentNotificationService = paymentNotificationService;
     }
 
     public PaymentDueResponse getPaymentDue(String rentalUnitId, String tenantId) {
@@ -165,8 +157,9 @@ public class UnitRentPaymentService {
 
             if (request.getAmount().compareTo(depositAmount) < 0) {
                 throw new BadRequestException(
-                        "Payment of " + request.getAmount() + " is less than the required security deposit of "
-                                + depositAmount + ". Deposit must be settled before or alongside rent.");
+                        "Payment of " + MoneyUtils.format(request.getAmount())
+                                + " is less than the required security deposit of "
+                                + MoneyUtils.format(depositAmount) + ". Deposit must be settled before or alongside rent.");
             }
             depositToApply = depositAmount;
         }
@@ -193,16 +186,17 @@ public class UnitRentPaymentService {
         UnitRentPayment saved = booking.payment();
         walletPaymentService.markBooked(transfer.getReference(), saved.getId());
 
-        // Best-effort payment confirmation — fires for every successful
-        // payment, exact/partial/overpaid alike. Separate from the
-        // overpayment notice below, which carries different, more specific
-        // messaging and only applies to the credit case.
-        taskExecutor.execute(() -> notifyPaymentReceived(tenantId, unit, property, saved));
-
-        if (booking.status() == PaymentStatus.OVERPAID) {
-            BigDecimal creditAmount = booking.balanceAfter().negate();
-            taskExecutor.execute(() -> notifyTenantOfOverpayment(tenantId, unit, property, creditAmount));
-        }
+        // Best-effort, asynchronous: tenant receipt (email + SMS) and an email to the property owner
+        // whose wallet was credited. Never affects the payment that is already booked.
+        BigDecimal balanceAfter = booking.balanceAfter();
+        paymentNotificationService.notifyRentPaid(new PaymentNotificationService.RentReceipt(
+                tenantId, transfer.getOwnerId(), transfer.getRecipientAccount(),
+                property != null ? property.getTitle() : null, unit.getUnitNumber(),
+                saved.getAmount(), saved.getDepositAmountApplied(), saved.getRentAmountApplied(),
+                saved.getStatus(), saved.getPaymentReference(), saved.getPaidAt(),
+                List.of(),
+                balanceAfter.signum() < 0 ? balanceAfter.negate() : null,
+                balanceAfter.signum() > 0 ? balanceAfter : null));
 
         return toResponse(saved, unit);
     }
@@ -288,7 +282,7 @@ public class UnitRentPaymentService {
         StringBuilder message = new StringBuilder();
 
         if (depositApplied.compareTo(BigDecimal.ZERO) > 0) {
-            message.append("KES ").append(depositApplied).append(" applied to your security deposit. ");
+            message.append(MoneyUtils.format(depositApplied)).append(" applied to your security deposit. ");
         }
 
         if (paymentType == PaymentType.SECURITY_DEPOSIT) {
@@ -298,10 +292,10 @@ public class UnitRentPaymentService {
 
         message.append(switch (status) {
             case PAID -> "Rent payment received in full. Account is fully settled.";
-            case OVERPAID -> "Rent payment received with an overpayment of KES " + balanceAfter.negate()
+            case OVERPAID -> "Rent payment received with an overpayment of " + MoneyUtils.format(balanceAfter.negate())
                     + " credited to your account. This credit will be applied automatically to your next "
                     + "rent charge, or contact your property owner regarding a refund.";
-            case PARTIALLY_PAID -> "Partial rent payment received. KES " + balanceAfter
+            case PARTIALLY_PAID -> "Partial rent payment received. " + MoneyUtils.format(balanceAfter)
                     + " is still outstanding.";
             default -> "Rent payment recorded.";
         });
@@ -310,93 +304,10 @@ public class UnitRentPaymentService {
     }
 
     /**
-     * Best-effort payment confirmation (email + SMS) — fires for every
-     * successful payment regardless of whether it was exact, partial, or
-     * overpaid. Kept separate from notifyTenantOfOverpayment, which only
-     * covers the credit case and carries different messaging; a payment
-     * that triggers both methods sends two distinct notices, by design.
-     * Never throws; a notification failure must not affect a payment
-     * that's already booked. Runs on taskExecutor, off the request thread.
-     */
-    private void notifyPaymentReceived(String tenantId, RentalUnit unit, Property property, UnitRentPayment payment) {
-        try {
-            tenantRepository.findById(tenantId).ifPresentOrElse(tenant -> {
-                String subject = "Payment Received";
-                String body = buildPaymentReceivedBody(tenant, unit, property, payment);
-
-                boolean emailSent = emailService.sendNoticeEmail(
-                        tenant.getEmail(), tenant.getFullName(), subject, "PAYMENT_RECEIVED", body);
-
-                boolean smsSent = smsService.sendNoticeSms(
-                        tenant.getPhoneNumber(), subject + " — " + locationSummary(unit, property)
-                                + ": KES " + payment.getAmount() + " received.");
-
-                log.info("Payment confirmation sent for payment {} on unit {} (emailSent={}, smsSent={})",
-                        payment.getId(), unit.getId(), emailSent, smsSent);
-            }, () -> log.warn("Could not send payment confirmation — tenant {} not found", tenantId));
-        } catch (Exception e) {
-            log.error("Failed to send payment confirmation for payment {} on unit {}: {}",
-                    payment.getId(), unit.getId(), e.getMessage());
-        }
-    }
-
-    private String buildPaymentReceivedBody(Tenant tenant, RentalUnit unit, Property property,
-                                             UnitRentPayment payment) {
-        String name = tenant.getFullName() != null && !tenant.getFullName().isBlank()
-                ? tenant.getFullName() : "there";
-        StringBuilder body = new StringBuilder();
-        body.append("Hi ").append(name).append(",\n\n");
-        body.append("We've received your payment of KES ").append(payment.getAmount())
-                .append(" for ").append(locationSummary(unit, property)).append(".\n\n");
-        if (payment.getDescription() != null && !payment.getDescription().isBlank()) {
-            body.append(payment.getDescription()).append("\n");
-        }
-        body.append("\nThank you for your payment.");
-        return body.toString();
-    }
-
-    /**
-     * Best-effort tenant notification about an overpayment credit — never
-     * throws; a notification failure must not affect a payment already
-     * booked. Runs on taskExecutor, off the request thread.
-     */
-    private void notifyTenantOfOverpayment(String tenantId, RentalUnit unit, Property property,
-                                            BigDecimal creditAmount) {
-        try {
-            tenantRepository.findById(tenantId).ifPresentOrElse(tenant -> {
-                String subject = "Overpayment Received — Credit on Your Account";
-                String body = buildOverpaymentNotificationBody(tenant, unit, property, creditAmount);
-
-                boolean emailSent = emailService.sendNoticeEmail(
-                        tenant.getEmail(), tenant.getFullName(), subject, "PAYMENT_UPDATE", body);
-                boolean smsSent = smsService.sendNoticeSms(tenant.getPhoneNumber(),
-                        subject + " (" + locationSummary(unit, property) + "): " + body);
-
-                log.info("Overpayment notification sent for tenant {} on unit {} (emailSent={}, smsSent={})",
-                        tenantId, unit.getId(), emailSent, smsSent);
-            }, () -> log.warn("Could not send overpayment notification — tenant {} not found", tenantId));
-        } catch (Exception e) {
-            log.error("Failed to send overpayment notification for tenant {} on unit {}: {}",
-                    tenantId, unit.getId(), e.getMessage());
-        }
-    }
-
-    private String buildOverpaymentNotificationBody(Tenant tenant, RentalUnit unit, Property property,
-                                                      BigDecimal creditAmount) {
-        String name = tenant.getFullName() != null && !tenant.getFullName().isBlank()
-                ? tenant.getFullName() : "there";
-        return "Hi " + name + ",\n\nRegarding your account for " + locationSummary(unit, property) + ":\n\n"
-                + "Your recent rent payment exceeded your current balance due. "
-                + "An overpayment of KES " + creditAmount + " has been credited to your account and will "
-                + "be applied automatically toward your next rent charge. Please contact your property "
-                + "owner if you'd prefer a refund instead.\n\nThank you for your prompt payment.";
-    }
-
-    /**
      * Human-readable "which property/unit is this about" fragment, used in
-     * the wallet transfer description and in notification emails/SMS so a
-     * tenant on more than one unit can tell them apart at a glance. Falls
-     * back gracefully if the property lookup came back empty.
+     * the wallet transfer description so a tenant on more than one unit can
+     * tell them apart at a glance. Falls back gracefully if the property
+     * lookup came back empty.
      */
     private String locationSummary(RentalUnit unit, Property property) {
         String propertyName = (property != null && property.getTitle() != null && !property.getTitle().isBlank())

@@ -1,5 +1,6 @@
 package com.premisave.property.entity;
 
+import com.premisave.property.util.Constants;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -9,5 +10,5 @@ import java.util.Currency;
 public class Money {
 
     private BigDecimal amount;
-    private Currency currency = Currency.getInstance("KES"); // Default to Kenyan Shilling
+    private Currency currency = Currency.getInstance(Constants.DEFAULT_CURRENCY); // USD, matching wallet-service
 }

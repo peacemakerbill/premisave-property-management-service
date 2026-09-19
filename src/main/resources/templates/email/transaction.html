@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="color-scheme" content="light"/>
+    <meta name="supported-color-schemes" content="light"/>
+    <title th:text="${c.title}">Premisave</title>
+    <style>
+        @media only screen and (max-width: 620px) {
+            .container { width: 100% !important; border-radius: 0 !important; }
+            .px { padding-left: 20px !important; padding-right: 20px !important; }
+            .amount { font-size: 30px !important; }
+            .stack { display: block !important; width: 100% !important; text-align: left !important; }
+            .stack-value { padding-top: 0 !important; }
+        }
+    </style>
+</head>
+<!--
+  One template for every money-related email (payment receipts, deposits, utility bills,
+  failures). What differs between them — tone, title, amounts, rows, callout — comes from
+  the EmailContent model. Table layout + inline styles for Outlook; the <style> block only
+  adds mobile tweaks and is safely ignored where unsupported.
+-->
+<body style="margin:0; padding:0; background-color:#F5F0E8; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-text-size-adjust:100%;">
+
+<!-- Inbox preview text -->
+<div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent; mso-hide:all;"
+     th:text="${c.preheader}">Preview text</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#F5F0E8"
+       style="background-color:#F5F0E8; padding:28px 12px;">
+    <tr>
+        <td align="center">
+            <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0"
+                   style="width:600px; max-width:600px; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #E8E0CF;">
+
+                <tr th:replace="~{email/fragments :: header}"></tr>
+
+                <!-- Hero: icon + title -->
+                <tr>
+                    <td class="px" style="padding:32px 32px 0 32px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td width="56" valign="top">
+                                    <table role="presentation" cellpadding="0" cellspacing="0">
+                                        <tr>
+                                            <td align="center" valign="middle" width="52" height="52"
+                                                th:style="'width:52px; height:52px; border-radius:26px; background-color:' + ${c.tone.soft} + '; border:2px solid ' + ${c.tone.border} + '; color:' + ${c.tone.accent} + '; font-size:24px; font-weight:700; line-height:52px; text-align:center;'"
+                                                th:text="${c.tone.icon}">&#10003;</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td valign="middle" style="padding-left:16px;">
+                                    <div style="font-size:22px; font-weight:700; color:#1A1A1A; line-height:1.25;"
+                                         th:text="${c.title}">Payment received</div>
+                                    <div th:if="${c.subtitle != null}"
+                                         style="font-size:14px; color:#6B7A76; margin-top:4px;"
+                                         th:text="${c.subtitle}">Property, Unit</div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- Greeting + intro -->
+                <tr>
+                    <td class="px" style="padding:24px 32px 0 32px; color:#3D4A47; font-size:15px; line-height:1.65;">
+                        <p style="margin:0 0 12px 0;">Hi <span th:text="${c.greetingName != null ? c.greetingName : 'there'}">there</span>,</p>
+                        <p th:each="p : ${c.paragraphs}" style="margin:0 0 12px 0;" th:text="${p}">Paragraph</p>
+                    </td>
+                </tr>
+
+                <!-- Amount card -->
+                <tr th:if="${c.amount != null}">
+                    <td class="px" style="padding:12px 32px 4px 32px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                               th:style="'background-color:' + ${c.tone.soft} + '; border:1px solid ' + ${c.tone.border} + '; border-radius:10px;'">
+                            <tr>
+                                <td align="center" style="padding:22px 24px;">
+                                    <div style="font-size:12px; color:#6B7A76; text-transform:uppercase; letter-spacing:1px; font-weight:600;"
+                                         th:text="${c.amountLabel != null ? c.amountLabel : 'Amount'}">Amount</div>
+                                    <div class="amount"
+                                         th:style="'font-size:36px; font-weight:800; margin-top:6px; letter-spacing:-0.5px; color:' + ${c.tone.ink} + ';'">
+                                        <span style="font-size:16px; font-weight:700; vertical-align:middle;" th:text="${c.currency}">USD</span>
+                                        <span th:text="${c.amount}">0.00</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- Detail sections -->
+                <tr th:each="s : ${c.sections}">
+                    <td class="px" style="padding:20px 32px 0 32px;">
+                        <div th:if="${s.title != null}"
+                             style="display:inline-block; font-size:12px; font-weight:700; color:#1A3C34; text-transform:uppercase; letter-spacing:1px; padding-bottom:6px; border-bottom:2px solid #C9A84C;"
+                             th:text="${s.title}">Details</div>
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                               style="font-size:14px; margin-top:4px;">
+                            <tr th:each="r, st : ${s.rows}">
+                                <td class="stack"
+                                    th:style="'padding:11px 12px 11px 0; color:#6B7A76; vertical-align:top; border-bottom:' + (${st.last} ? '0' : '1px solid #EDE7DA') + ';'"
+                                    th:text="${r.label}">Label</td>
+                                <td class="stack stack-value" align="right"
+                                    th:style="'padding:11px 0; color:#1A1A1A; font-weight:600; text-align:right; vertical-align:top; word-break:break-word; border-bottom:' + (${st.last} ? '0' : '1px solid #EDE7DA') + ';'">
+                                    <span th:text="${r.value}">Value</span>
+                                    <span th:if="${r.badge != null}"
+                                          th:style="'display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:0.3px; background-color:' + ${r.badgeTone.soft} + '; color:' + ${r.badgeTone.ink} + ';'"
+                                          th:text="${r.badge}">Paid</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- Callout -->
+                <tr th:if="${c.callout != null}">
+                    <td class="px" style="padding:20px 32px 0 32px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                               th:style="'background-color:' + ${c.callout.tone.soft} + '; border:1px solid ' + ${c.callout.tone.border} + '; border-left:4px solid ' + ${c.callout.tone.accent} + '; border-radius:8px;'">
+                            <tr>
+                                <td style="padding:14px 18px;">
+                                    <div th:if="${c.callout.title != null}"
+                                         th:style="'font-size:13px; font-weight:700; margin-bottom:4px; color:' + ${c.callout.tone.ink} + ';'"
+                                         th:text="${c.callout.title}">Heads up</div>
+                                    <div th:style="'font-size:14px; line-height:1.55; color:' + ${c.callout.tone.ink} + ';'"
+                                         th:text="${c.callout.text}">Callout text</div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- Button -->
+                <tr th:if="${c.ctaUrl != null}">
+                    <td class="px" align="left" style="padding:26px 32px 0 32px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td bgcolor="#1A3C34" style="background-color:#1A3C34; border-radius:8px;">
+                                    <a th:href="${c.ctaUrl}" href="#"
+                                       style="display:inline-block; padding:13px 26px; color:#F5F0E8; font-size:14px; font-weight:700; text-decoration:none; border-radius:8px; letter-spacing:0.3px;"
+                                       th:text="${c.ctaLabel != null ? c.ctaLabel : 'Open Premisave'}">Open Premisave</a>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- Footnote + spacing -->
+                <tr>
+                    <td class="px" style="padding:24px 32px 32px 32px;">
+                        <p th:if="${c.footnote != null}"
+                           style="margin:0; font-size:13px; color:#6B7A76; line-height:1.6;"
+                           th:text="${c.footnote}">Footnote</p>
+                    </td>
+                </tr>
+
+                <tr th:replace="~{email/fragments :: footer}"></tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

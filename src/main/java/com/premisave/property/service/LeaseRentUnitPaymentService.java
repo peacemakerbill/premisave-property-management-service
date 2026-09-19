@@ -30,9 +30,9 @@ import com.premisave.property.repository.RentScheduleRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.SecurityDepositRepository;
 import com.premisave.property.repository.TenantRepository;
+import com.premisave.property.util.MoneyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,7 +42,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
@@ -66,11 +65,7 @@ public class LeaseRentUnitPaymentService {
     private final SecurityDepositService securityDepositService;
     private final WalletPaymentService walletPaymentService;
     private final TenantRepository tenantRepository;
-    private final EmailService emailService;
-    private final SmsService smsService;
-
-    @Qualifier("taskExecutor")
-    private final Executor taskExecutor;
+    private final PaymentNotificationService paymentNotificationService;
 
     // ------------------------------------------------------------------
     // Payments are funded from the tenant's Premisave wallet: recordPayment()
@@ -183,8 +178,9 @@ public class LeaseRentUnitPaymentService {
 
             if (request.getAmount().compareTo(depositAmount) < 0) {
                 throw new BadRequestException(
-                        "Payment of " + request.getAmount() + " is less than the required security deposit of "
-                                + depositAmount + ". Deposit must be settled before or alongside rent.");
+                        "Payment of " + MoneyUtils.format(request.getAmount())
+                                + " is less than the required security deposit of "
+                                + MoneyUtils.format(depositAmount) + ". Deposit must be settled before or alongside rent.");
             }
             depositToApply = depositAmount;
         }
@@ -219,22 +215,20 @@ public class LeaseRentUnitPaymentService {
         RentApplicationResult rentResult = booking.rentResult();
         walletPaymentService.markBooked(transfer.getReference(), saved.getId());
 
-        RentalUnit notificationUnit = unit;
-
-        // Best-effort payment confirmation — fires for every successful
-        // payment, exact/partial/overpaid alike. Separate from the
-        // overpayment notice below, which carries different, more specific
-        // messaging and only applies to the spillover/credit case.
-        taskExecutor.execute(() -> notifyPaymentReceived(tenantId, lease, notificationUnit, property, saved));
-
-        // Best-effort tenant notification — only when the payment spilled
-        // into a future billing period or ended up as a pure credit (no
-        // more schedule entries left to apply it to). Dispatched via
-        // taskExecutor so the email/SMS round-trip doesn't add latency.
-        if (rentResult.spilloverOccurred()) {
-            taskExecutor.execute(() ->
-                    notifyTenantOfOverpayment(tenantId, lease, notificationUnit, property, rentResult));
-        }
+        // Best-effort, asynchronous: tenant receipt (email + SMS) and an email to the property owner
+        // whose wallet was credited. Never affects the payment that is already booked.
+        paymentNotificationService.notifyRentPaid(new PaymentNotificationService.RentReceipt(
+                tenantId, transfer.getOwnerId(), transfer.getRecipientAccount(),
+                property != null ? property.getTitle() : null,
+                unit != null ? unit.getUnitNumber() : null,
+                saved.getAmountPaid(), saved.getDepositAmountApplied(), saved.getRentAmountApplied(),
+                saved.getStatus(), saved.getPaymentReference(), saved.getPaidAt(),
+                rentResult.applications().stream()
+                        .map(a -> new PaymentNotificationService.PeriodLine(
+                                a.dueDate(), a.amountApplied(), a.resultingStatus()))
+                        .toList(),
+                rentResult.finalStatus() == PaymentStatus.OVERPAID ? rentResult.finalOverpaidAmount() : null,
+                null));
 
         return toResponse(saved);
     }
@@ -312,9 +306,9 @@ public class LeaseRentUnitPaymentService {
         while (remaining.compareTo(BigDecimal.ZERO) > 0) {
             if (++iterations > MAX_SCHEDULES_TO_APPLY_PER_PAYMENT) {
                 log.warn("Rent payment for lease {} touched more than {} schedule entries — stopping to avoid "
-                                + "a runaway loop. Remaining KES {} will be credited as an overpayment on the "
+                                + "a runaway loop. Remaining {} will be credited as an overpayment on the "
                                 + "last schedule entry touched.",
-                        leaseId, MAX_SCHEDULES_TO_APPLY_PER_PAYMENT, remaining);
+                        leaseId, MAX_SCHEDULES_TO_APPLY_PER_PAYMENT, MoneyUtils.format(remaining));
                 break;
             }
 
@@ -378,111 +372,9 @@ public class LeaseRentUnitPaymentService {
     }
 
     /**
-     * Best-effort payment confirmation (email + SMS) — fires for every
-     * successful payment regardless of whether it was exact, partial, or
-     * overpaid. Kept separate from notifyTenantOfOverpayment, which only
-     * covers the spillover/credit case and carries different messaging;
-     * a payment that triggers both methods sends two distinct notices, by
-     * design. Never throws; a notification failure must not affect a
-     * payment that's already booked.
-     */
-    private void notifyPaymentReceived(String tenantId, Lease lease, RentalUnit unit, Property property,
-                                        LeaseRentUnitPayment payment) {
-        try {
-            tenantRepository.findById(tenantId).ifPresentOrElse(tenant -> {
-                String subject = "Payment Received";
-                String body = buildPaymentReceivedBody(tenant.getFullName(), unit, property, payment);
-
-                boolean emailSent = emailService.sendNoticeEmail(
-                        tenant.getEmail(), tenant.getFullName(), subject, "PAYMENT_RECEIVED", body);
-
-                boolean smsSent = smsService.sendNoticeSms(
-                        tenant.getPhoneNumber(), subject + " — " + locationSummary(unit, property)
-                                + ": KES " + payment.getAmountPaid() + " received.");
-
-                log.info("Payment confirmation sent for payment {} on lease {} (emailSent={}, smsSent={})",
-                        payment.getId(), lease.getId(), emailSent, smsSent);
-            }, () -> log.warn("Could not send payment confirmation — tenant {} not found", tenantId));
-        } catch (Exception e) {
-            log.error("Failed to send payment confirmation for payment {} on lease {}: {}",
-                    payment.getId(), lease.getId(), e.getMessage());
-        }
-    }
-
-    private String buildPaymentReceivedBody(String tenantName, RentalUnit unit, Property property,
-                                             LeaseRentUnitPayment payment) {
-        StringBuilder body = new StringBuilder();
-        body.append("Hi ").append(tenantName != null && !tenantName.isBlank() ? tenantName : "there").append(",\n\n");
-        body.append("We've received your payment of KES ").append(payment.getAmountPaid())
-                .append(" for ").append(locationSummary(unit, property)).append(".\n\n");
-        if (payment.getDescription() != null && !payment.getDescription().isBlank()) {
-            body.append(payment.getDescription()).append("\n");
-        }
-        body.append("\nThank you for your payment.");
-        return body.toString();
-    }
-
-    /**
-     * Best-effort tenant notification (email + SMS) about an overpayment —
-     * either money automatically applied to upcoming rent, or a pure credit
-     * held because no further schedule entries exist. Never throws; a
-     * notification failure must not affect a payment that's already booked.
-     */
-    private void notifyTenantOfOverpayment(String tenantId, Lease lease, RentalUnit unit, Property property,
-                                            RentApplicationResult rentResult) {
-        try {
-            tenantRepository.findById(tenantId).ifPresentOrElse(tenant -> {
-                boolean isPureCredit = rentResult.finalStatus() == PaymentStatus.OVERPAID;
-                String subject = isPureCredit
-                        ? "Overpayment Received — Credit on Your Account"
-                        : "Payment Applied to Upcoming Rent";
-
-                String body = buildOverpaymentNotificationBody(
-                        tenant.getFullName(), unit, property, isPureCredit, rentResult);
-
-                boolean emailSent = emailService.sendNoticeEmail(
-                        tenant.getEmail(), tenant.getFullName(), subject, "PAYMENT_UPDATE", body);
-
-                boolean smsSent = smsService.sendNoticeSms(
-                        tenant.getPhoneNumber(), subject + " (" + locationSummary(unit, property) + "): " + body);
-
-                log.info("Overpayment notification sent for tenant {} on lease {} (emailSent={}, smsSent={})",
-                        tenantId, lease.getId(), emailSent, smsSent);
-            }, () -> log.warn("Could not send overpayment notification — tenant {} not found", tenantId));
-        } catch (Exception e) {
-            log.error("Failed to send overpayment notification for tenant {} on lease {}: {}",
-                    tenantId, lease.getId(), e.getMessage());
-        }
-    }
-
-    private String buildOverpaymentNotificationBody(String tenantName, RentalUnit unit, Property property,
-                                                      boolean isPureCredit, RentApplicationResult rentResult) {
-        StringBuilder body = new StringBuilder();
-        body.append("Hi ").append(tenantName != null && !tenantName.isBlank() ? tenantName : "there").append(",\n\n");
-        body.append("Regarding your account for ").append(locationSummary(unit, property)).append(":\n\n");
-
-        if (isPureCredit) {
-            body.append("Your recent rent payment exceeded the total amount currently due on your lease. ")
-                    .append("An overpayment of KES ").append(rentResult.finalOverpaidAmount())
-                    .append(" has been credited to your account. Please contact your property owner to arrange ")
-                    .append("a refund, or to have it applied toward a future bill.\n");
-        } else {
-            body.append("Your recent rent payment was more than the amount due for your current billing period. ")
-                    .append("The extra amount has been automatically applied toward your upcoming rent, ")
-                    .append("covering the following period(s):\n");
-            rentResult.applications().forEach(app ->
-                    body.append("- ").append(app.dueDate()).append(": KES ").append(app.amountApplied())
-                            .append(" (").append(app.resultingStatus()).append(")\n"));
-        }
-
-        body.append("\nThank you for your prompt payment.");
-        return body.toString();
-    }
-
-    /**
      * Human-readable "which property/unit is this about" fragment, used in
-     * the wallet transfer description and in notification emails/SMS so a
-     * tenant on more than one lease/unit can tell them apart at a glance.
+     * the wallet transfer description so a tenant on more than one lease/unit
+     * can tell them apart at a glance.
      * Falls back gracefully if property or unit lookups came back empty.
      */
     private String locationSummary(RentalUnit unit, Property property) {
@@ -538,7 +430,7 @@ public class LeaseRentUnitPaymentService {
         StringBuilder message = new StringBuilder();
 
         if (depositApplied.compareTo(BigDecimal.ZERO) > 0) {
-            message.append("KES ").append(depositApplied).append(" applied to your security deposit. ");
+            message.append(MoneyUtils.format(depositApplied)).append(" applied to your security deposit. ");
         }
 
         List<ScheduleApplication> applications = rentResult.applications();
@@ -553,26 +445,27 @@ public class LeaseRentUnitPaymentService {
         if (applications.size() == 1) {
             ScheduleApplication app = applications.get(0);
             message.append(switch (app.resultingStatus()) {
-                case PAID -> "Rent payment of KES " + app.amountApplied() + " received in full for the period due "
-                        + app.dueDate() + ".";
-                case PARTIALLY_PAID -> "Partial rent payment of KES " + app.amountApplied()
+                case PAID -> "Rent payment of " + MoneyUtils.format(app.amountApplied())
+                        + " received in full for the period due " + app.dueDate() + ".";
+                case PARTIALLY_PAID -> "Partial rent payment of " + MoneyUtils.format(app.amountApplied())
                         + " received for the period due " + app.dueDate() + ".";
-                case OVERPAID -> "Rent payment received with an overpayment of KES " + app.amountApplied()
-                        + " credited above the amount due for the period due " + app.dueDate()
-                        + ". Please contact your property owner regarding a credit or refund.";
-                default -> "Rent payment of KES " + app.amountApplied() + " recorded for the period due "
-                        + app.dueDate() + ".";
+                case OVERPAID -> "Rent payment received with an overpayment of "
+                        + MoneyUtils.format(app.amountApplied()) + " credited above the amount due for the period due "
+                        + app.dueDate() + ". Please contact your property owner regarding a credit or refund.";
+                default -> "Rent payment of " + MoneyUtils.format(app.amountApplied())
+                        + " recorded for the period due " + app.dueDate() + ".";
             });
         } else {
-            message.append("Rent payment of KES ").append(rentResult.totalRentApplied())
+            message.append("Rent payment of ").append(MoneyUtils.format(rentResult.totalRentApplied()))
                     .append(" applied across ").append(applications.size()).append(" billing periods: ");
 
             String breakdown = applications.stream()
                     .map(app -> switch (app.resultingStatus()) {
-                        case PAID -> app.dueDate() + " (paid in full, KES " + app.amountApplied() + ")";
-                        case PARTIALLY_PAID -> app.dueDate() + " (partially paid, KES " + app.amountApplied() + ")";
-                        case OVERPAID -> app.dueDate() + " (overpaid by KES " + app.amountApplied() + ")";
-                        default -> app.dueDate() + " (KES " + app.amountApplied() + ")";
+                        case PAID -> app.dueDate() + " (paid in full, " + MoneyUtils.format(app.amountApplied()) + ")";
+                        case PARTIALLY_PAID -> app.dueDate() + " (partially paid, "
+                                + MoneyUtils.format(app.amountApplied()) + ")";
+                        case OVERPAID -> app.dueDate() + " (overpaid by " + MoneyUtils.format(app.amountApplied()) + ")";
+                        default -> app.dueDate() + " (" + MoneyUtils.format(app.amountApplied()) + ")";
                     })
                     .reduce((a, b) -> a + "; " + b)
                     .orElse("");
@@ -580,7 +473,7 @@ public class LeaseRentUnitPaymentService {
             message.append(breakdown).append(".");
 
             if (rentResult.finalStatus() == PaymentStatus.OVERPAID) {
-                message.append(" The excess of KES ").append(rentResult.finalOverpaidAmount())
+                message.append(" The excess of ").append(MoneyUtils.format(rentResult.finalOverpaidAmount()))
                         .append(" has been credited as an overpayment. Please contact your property owner ")
                         .append("regarding a refund or credit toward a future bill.");
             } else {

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--
+  Shared pieces for every Premisave email. Used from the parent template as:
+      <tr th:replace="~{email/fragments :: header}"></tr>
+  Table layout + inline styles on purpose: Outlook desktop ignores flexbox/grid and
+  most <style> rules, so this is the only approach that renders the same everywhere.
+  Brand: forest green #1A3C34, gold #C9A84C, cream #F5F0E8.
+-->
+
+<tr th:fragment="header">
+    <td style="background-color:#1A3C34; padding:0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="px" style="padding:22px 32px;">
+                    <span style="color:#F5F0E8; font-size:22px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase;"
+                          th:text="${brandName}">Premisave</span>
+                    <span style="color:#C9A84C; font-size:11px; font-weight:600; letter-spacing:2px; text-transform:uppercase; padding-left:10px;">Property</span>
+                </td>
+            </tr>
+            <tr>
+                <td style="height:3px; line-height:3px; font-size:0; background-color:#C9A84C;">&nbsp;</td>
+            </tr>
+        </table>
+    </td>
+</tr>
+
+<tr th:fragment="footer">
+    <td style="background-color:#FAF7F0; padding:22px 32px; border-top:1px solid #EDE7DA;" class="px">
+        <p style="margin:0 0 6px 0; font-size:12px; color:#6B7A76; line-height:1.6;">
+            Questions? Contact us at
+            <a th:href="'mailto:' + ${supportEmail}" href="#" style="color:#1A3C34; font-weight:600;"
+               th:text="${supportEmail}">support@premisave.com</a>.
+        </p>
+        <p style="margin:0; font-size:11px; color:#9AA5A1; line-height:1.6;">
+            This is an automated message from <span th:text="${brandName}">Premisave</span>.
+            Please do not reply directly to this email.<br/>
+            &copy; <span th:text="${year}">2026</span> <span th:text="${brandName}">Premisave</span>. All rights reserved.
+        </p>
+    </td>
+</tr>
+
+</body>
+</html>

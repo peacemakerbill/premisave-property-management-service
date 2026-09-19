@@ -73,6 +73,7 @@ public class WalletPaymentService {
     private final PropertyRepository propertyRepository;
     private final OwnerRepository ownerRepository;
     private final ObjectMapper objectMapper;
+    private final PaymentNotificationService paymentNotificationService;
 
     @Value("${app.api-key}")
     private String internalApiKey;
@@ -311,6 +312,7 @@ public class WalletPaymentService {
                     response != null ? response.getMessage() : null,
                     "The wallet service did not complete the transfer");
             release(transfer, WalletTransferStatus.FAILED, reason);
+            notifyRejected(transfer, reason);
             throw new BadRequestException(reason);
         }
 
@@ -337,6 +339,7 @@ public class WalletPaymentService {
         if (status >= 400 && status < 500 && status != 408 && status != 429) {
             String reason = extractMessage(e);
             release(transfer, WalletTransferStatus.FAILED, reason);
+            notifyRejected(transfer, reason);
             return new BadRequestException(reason);
         }
 
@@ -345,6 +348,12 @@ public class WalletPaymentService {
                 transfer.getReference(), status, e.getMessage());
         release(transfer, WalletTransferStatus.INITIATED, null);
         return outcomeUnknown(transfer, e);
+    }
+
+    /** Tells the tenant (email + SMS, async) that wallet-service rejected the payment and nothing moved. */
+    private void notifyRejected(WalletTransfer transfer, String reason) {
+        paymentNotificationService.notifyPaymentFailed(transfer.getTenantId(), transfer.getDescription(),
+                transfer.getAmount(), reason, clientFacingReference(transfer.getReference()));
     }
 
     private WalletServiceException outcomeUnknown(WalletTransfer transfer, Throwable cause) {

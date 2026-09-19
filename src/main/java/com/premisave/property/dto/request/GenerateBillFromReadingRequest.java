@@ -12,7 +12,7 @@ public class GenerateBillFromReadingRequest {
     private String meterReadingId;
 
     /**
-     * Optional override for the configured utility rate (KES per unit).
+     * Optional override for the configured utility rate (USD per unit).
      * If omitted, the rate is resolved from the utility.rates config
      * based on the meter reading's utility type.
      */

@@ -24,9 +24,9 @@ import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.SecurityDepositRepository;
 import com.premisave.property.repository.TenantRepository;
+import com.premisave.property.util.MoneyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +35,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
@@ -47,11 +46,10 @@ public class SecurityDepositService {
     private final TenantRepository tenantRepository;
     private final PropertyRepository propertyRepository;
     private final RentalUnitRepository rentalUnitRepository;
-    private final EmailService emailService;
-    private final SmsService smsService;
 
-    @Qualifier("taskExecutor")
-    private final Executor taskExecutor;
+    // Emails/SMS are sent asynchronously inside this service (@Async on the shared
+    // "taskExecutor" pool), so nothing here waits on SMTP/SMS.
+    private final PaymentNotificationService notificationService;
 
     @Transactional
     public SecurityDepositResponse holdDeposit(SecurityDepositRequest request) {
@@ -63,7 +61,7 @@ public class SecurityDepositService {
         }
 
         SecurityDeposit saved = hasLease ? holdLeaseDeposit(request) : holdUnitDeposit(request);
-        taskExecutor.execute(() -> notifyDepositHeld(saved));
+        notifyDepositHeld(saved);
         return toResponse(saved);
     }
 
@@ -152,8 +150,9 @@ public class SecurityDepositService {
 
         if (requestedAmount.compareTo(remaining) > 0) {
             throw new BadRequestException(
-                    "Refund amount (" + requestedAmount + ") exceeds the remaining refundable balance ("
-                            + remaining + "). Total refunds cannot exceed the deposit held.");
+                    "Refund amount (" + MoneyUtils.format(requestedAmount)
+                            + ") exceeds the remaining refundable balance (" + MoneyUtils.format(remaining)
+                            + "). Total refunds cannot exceed the deposit held.");
         }
 
         boolean isFinalRefund = requestedAmount.compareTo(remaining) == 0;
@@ -179,9 +178,7 @@ public class SecurityDepositService {
 
         SecurityDeposit saved = depositRepository.save(deposit);
 
-        BigDecimal newRemaining = saved.getAmount().subtract(newRefundedTotal);
-        taskExecutor.execute(() ->
-                notifyRefund(saved, requestedAmount, entry.getReason(), isFinalRefund, newRemaining));
+        notifyRefund(saved, requestedAmount, entry.getReason(), isFinalRefund);
 
         return toResponse(saved);
     }
@@ -245,7 +242,8 @@ public class SecurityDepositService {
             response.setPartialRefund(false);
             response.setExceedsRemainingBalance(true);
             response.setReasonRequired(false);
-            response.setMessage("This amount exceeds the remaining refundable balance of " + remaining + ".");
+            response.setMessage("This amount exceeds the remaining refundable balance of "
+                    + MoneyUtils.format(remaining) + ".");
         } else if (comparison == 0) {
             response.setFullRefund(true);
             response.setPartialRefund(false);
@@ -289,84 +287,56 @@ public class SecurityDepositService {
     }
 
     // ------------------------------------------------------------------
-    // Notifications — best-effort, mirrors EmailService/SmsService's own
-    // contract: never allowed to throw or block the deposit/refund that
-    // already committed successfully. Skipped silently if the tenant
-    // can't be resolved; each service already skips on its own if the
-    // tenant has no email/phone on file.
-    //
-    // Dispatched via taskExecutor.execute(...) at the call site rather than
-    // via @Async: an @Async annotation on a method called from elsewhere in
-    // this same class would be silently ignored (Spring's proxy never sees
-    // the call), so submitting to the shared executor bean directly is the
-    // correct way to get this off the request thread without introducing a
-    // separate bean just to host @Async methods.
+    // Notifications — best-effort. The emails themselves are built and sent by
+    // PaymentNotificationService (asynchronously); this only gathers the values.
+    // A lookup problem here is logged and never allowed to fail the deposit/refund
+    // that has already been saved.
     // ------------------------------------------------------------------
 
     private void notifyDepositHeld(SecurityDeposit deposit) {
-        Tenant tenant = tenantRepository.findById(deposit.getTenantId()).orElse(null);
-        if (tenant == null) {
-            log.warn("Skipping deposit-held notification — tenant {} not found", deposit.getTenantId());
-            return;
+        try {
+            Location location = resolveLocation(deposit);
+            notificationService.notifyDepositHeld(new PaymentNotificationService.DepositReceipt(
+                    deposit.getTenantId(), location.propertyTitle(), location.unitNumber(),
+                    deposit.getAmount(), LocalDateTime.now()));
+        } catch (RuntimeException e) {
+            log.warn("Could not queue deposit-held notification for deposit {}: {}", deposit.getId(), e.getMessage());
         }
-
-        String location = resolveLocationSummary(deposit);
-
-        String subject = "Security Deposit Received";
-        String content = "We've recorded and held your security deposit of KES " + deposit.getAmount()
-                + " for " + location + ". This will be refunded (in full or in part) when your tenancy ends, "
-                + "subject to the condition of the property.";
-        String smsMessage = "Premisave: Your security deposit of KES " + deposit.getAmount()
-                + " for " + location + " has been recorded and held.";
-
-        emailService.sendNoticeEmail(tenant.getEmail(), tenant.getFullName(), subject,
-                "SECURITY_DEPOSIT_HELD", content);
-        smsService.sendNoticeSms(tenant.getPhoneNumber(), smsMessage);
     }
 
-    private void notifyRefund(SecurityDeposit deposit, BigDecimal refundedNow, String reason,
-                               boolean isFinalRefund, BigDecimal remaining) {
-        Tenant tenant = tenantRepository.findById(deposit.getTenantId()).orElse(null);
-        if (tenant == null) {
-            log.warn("Skipping refund notification — tenant {} not found", deposit.getTenantId());
-            return;
-        }
+    private void notifyRefund(SecurityDeposit deposit, BigDecimal refundedNow, String reason, boolean isFinalRefund) {
+        try {
+            Location location = resolveLocation(deposit);
 
-        String location = resolveLocationSummary(deposit);
-        String subject = isFinalRefund ? "Security Deposit Fully Refunded" : "Security Deposit Partially Refunded";
+            BigDecimal totalRefunded = deposit.getRefundedAmount() != null
+                    ? deposit.getRefundedAmount() : BigDecimal.ZERO;
+            List<PaymentNotificationService.RefundLine> history = deposit.getRefundHistory() == null
+                    ? List.of()
+                    : deposit.getRefundHistory().stream()
+                            .map(e -> new PaymentNotificationService.RefundLine(
+                                    e.getRefundedAt(), e.getAmount(), e.getReason()))
+                            .toList();
 
-        StringBuilder content = new StringBuilder("A refund of KES ").append(refundedNow)
-                .append(" has been issued against your security deposit for ").append(location).append(".");
-        if (reason != null && !reason.isBlank()) {
-            content.append(" Reason: ").append(reason).append(".");
+            notificationService.notifyDepositRefund(new PaymentNotificationService.DepositRefundReceipt(
+                    deposit.getTenantId(), location.propertyTitle(), location.unitNumber(),
+                    refundedNow, reason, isFinalRefund,
+                    deposit.getAmount(), totalRefunded, deposit.getAmount().subtract(totalRefunded),
+                    history, LocalDateTime.now()));
+        } catch (RuntimeException e) {
+            log.warn("Could not queue refund notification for deposit {}: {}", deposit.getId(), e.getMessage());
         }
-        if (isFinalRefund) {
-            content.append(" Your deposit has now been fully refunded.");
-        } else {
-            content.append(" Remaining balance still held: KES ").append(remaining).append(".");
-        }
+    }
 
-        StringBuilder smsMessage = new StringBuilder("Premisave: KES ").append(refundedNow)
-                .append(isFinalRefund ? " refunded — deposit fully settled (" : " refunded from your deposit (")
-                .append(location).append(").");
-        if (!isFinalRefund) {
-            smsMessage.append(" Remaining: KES ").append(remaining).append(".");
-        }
-
-        emailService.sendNoticeEmail(tenant.getEmail(), tenant.getFullName(), subject,
-                "SECURITY_DEPOSIT_REFUND", content.toString());
-        smsService.sendNoticeSms(tenant.getPhoneNumber(), smsMessage.toString());
+    private record Location(String propertyTitle, String unitNumber) {
     }
 
     /**
      * Resolves "which property/unit is this deposit about" the same way
      * enrichWithSummaries() does for the API response — lease-backed
      * deposits pull property (and unit, if any) from the Lease; unit-backed
-     * deposits pull property from the RentalUnit directly. Kept separate
-     * from enrichWithSummaries since that method populates a response DTO,
-     * while this one only needs a short display string for notifications.
+     * deposits pull property from the RentalUnit directly.
      */
-    private String resolveLocationSummary(SecurityDeposit deposit) {
+    private Location resolveLocation(SecurityDeposit deposit) {
         String propertyId = null;
         String rentalUnitId = deposit.getRentalUnitId();
 
@@ -387,24 +357,7 @@ public class SecurityDepositService {
 
         Property property = propertyId != null ? propertyRepository.findById(propertyId).orElse(null) : null;
 
-        return locationSummary(unit, property);
-    }
-
-    /**
-     * Human-readable "which property/unit is this about" fragment, used in
-     * both notification emails and SMS so a tenant with more than one
-     * deposit can tell them apart at a glance. Falls back gracefully if
-     * property or unit lookups came back empty — never lets a missing
-     * lookup break the notification itself.
-     */
-    private String locationSummary(RentalUnit unit, Property property) {
-        String propertyName = (property != null && property.getTitle() != null && !property.getTitle().isBlank())
-                ? property.getTitle() : "your property";
-
-        if (unit != null && unit.getUnitNumber() != null && !unit.getUnitNumber().isBlank()) {
-            return propertyName + ", Unit " + unit.getUnitNumber();
-        }
-        return propertyName;
+        return new Location(property != null ? property.getTitle() : null, unit != null ? unit.getUnitNumber() : null);
     }
 
     // ------------------------------------------------------------------

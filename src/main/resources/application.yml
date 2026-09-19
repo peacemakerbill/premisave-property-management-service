@@ -80,6 +80,10 @@ frontend:
 notifications:
   email:
     from: ${NOTICE_EMAIL_FROM:no-reply@premisave.com}
+    # Display name on the From line and in the email header/footer.
+    from-name: ${NOTICE_EMAIL_FROM_NAME:Premisave}
+    # Shown in every email footer as the "Questions?" contact.
+    support-address: ${SUPPORT_EMAIL:support@premisave.com}
 
 # Twilio (SMS notice delivery). No defaults on purpose — if these are blank,
 # SmsService logs a warning and skips sending rather than failing the notice.
@@ -89,7 +93,9 @@ twilio:
   from-number: ${TWILIO_FROM_NUMBER:}
   default-country-code: ${TWILIO_DEFAULT_COUNTRY_CODE:+254}
 
-# Utility billing rates (KES charged per unit of metered consumption)
+# Utility billing rates (USD charged per unit of metered consumption).
+# NOTE: these were KES amounts before the currency moved to USD (wallets are USD).
+# 20 and 200 would now mean USD 20 per kWh — set real USD rates via the env vars.
 utility:
   rates:
     electricity: ${UTILITY_RATE_ELECTRICITY:20}

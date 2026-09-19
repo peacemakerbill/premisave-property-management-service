@@ -29,6 +29,7 @@ import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.TenantRepository;
 import com.premisave.property.repository.UtilityBillRepository;
+import com.premisave.property.util.MoneyUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +51,7 @@ public class UtilityBillingService {
     private final PropertyRepository propertyRepository;
     private final UtilityRatesProperties utilityRatesProperties;
     private final WalletPaymentService walletPaymentService;
+    private final PaymentNotificationService paymentNotificationService;
 
     @Transactional
     public UtilityBillResponse generateBill(UtilityBillRequest request) {
@@ -68,7 +70,9 @@ public class UtilityBillingService {
         bill.setBillingPeriodStart(request.getBillingPeriodStart());
         bill.setBillingPeriodEnd(request.getBillingPeriodEnd());
 
-        return toResponse(utilityBillRepository.save(bill));
+        UtilityBill saved = utilityBillRepository.save(bill);
+        notifyBillIssued(saved, null, null);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -100,7 +104,9 @@ public class UtilityBillingService {
         bill.setBillingPeriodEnd(reading.getReadingDate());
         bill.setSourceMeterReadingId(reading.getId());
 
-        return toResponse(utilityBillRepository.save(bill));
+        UtilityBill saved = utilityBillRepository.save(bill);
+        notifyBillIssued(saved, reading, ratePerUnit);
+        return toResponse(saved);
     }
 
     /**
@@ -172,6 +178,16 @@ public class UtilityBillingService {
 
         walletPaymentService.markBooked(transfer.getReference(), saved.getId());
 
+        // Best-effort, asynchronous: receipt to the tenant and a notice to the owner whose wallet was credited.
+        Property property = propertyRepository.findById(unit.getPropertyId()).orElse(null);
+        BigDecimal balanceDue = saved.getAmount().subtract(saved.getAmountPaid()).max(BigDecimal.ZERO);
+        paymentNotificationService.notifyUtilityBillPaid(new PaymentNotificationService.UtilityPaymentReceipt(
+                tenantId, transfer.getOwnerId(), transfer.getRecipientAccount(),
+                saved.getUtilityType() != null ? saved.getUtilityType().name() : null,
+                property != null ? property.getTitle() : null, unit.getUnitNumber(),
+                request.getAmount(), saved.getAmount(), saved.getAmountPaid(), balanceDue,
+                saved.getStatus(), transfer.getReference(), LocalDateTime.now()));
+
         return toResponse(saved);
     }
 
@@ -235,6 +251,27 @@ public class UtilityBillingService {
     }
 
     // ------------------------------------------------------------------
+
+    /** Tells the tenant a new bill was issued (email + SMS, async). Never throws. */
+    private void notifyBillIssued(UtilityBill bill, MeterReading reading, BigDecimal ratePerUnit) {
+        try {
+            RentalUnit unit = bill.getRentalUnitId() != null
+                    ? rentalUnitRepository.findById(bill.getRentalUnitId()).orElse(null) : null;
+            Property property = unit != null && unit.getPropertyId() != null
+                    ? propertyRepository.findById(unit.getPropertyId()).orElse(null) : null;
+
+            paymentNotificationService.notifyUtilityBillIssued(new PaymentNotificationService.UtilityBillNotice(
+                    bill.getTenantId(), bill.getUtilityType() != null ? bill.getUtilityType().name() : null,
+                    property != null ? property.getTitle() : null, unit != null ? unit.getUnitNumber() : null,
+                    bill.getAmount(), bill.getBillingPeriodStart(), bill.getBillingPeriodEnd(), bill.getId(),
+                    reading != null ? reading.getPreviousReading() : null,
+                    reading != null ? reading.getCurrentReading() : null,
+                    reading != null ? reading.getConsumption() : null,
+                    ratePerUnit));
+        } catch (RuntimeException e) {
+            // A bill that is already saved must never fail because of a notification.
+        }
+    }
 
     private String resolveCurrentTenant(String rentalUnitId) {
         return occupancyHistoryRepository.findByRentalUnitIdAndMoveOutDateIsNull(rentalUnitId)
@@ -336,15 +373,15 @@ public class UtilityBillingService {
                                         BigDecimal balanceDue, BigDecimal overpaidAmount) {
         return switch (status) {
             case PAID -> "This bill has been paid in full. Thank you!";
-            case OVERPAID -> "Payment received in full, with an overpayment of KES " + overpaidAmount
+            case OVERPAID -> "Payment received in full, with an overpayment of " + MoneyUtils.format(overpaidAmount)
                     + " credited above the amount due. Please contact your property owner regarding a refund "
                     + "or credit toward a future bill.";
-            case PARTIALLY_PAID -> "Partial payment received. KES " + balanceDue + " is still outstanding "
-                    + "out of KES " + amount + ".";
-            case OVERDUE -> "This bill is overdue. KES " + balanceDue + " is outstanding.";
+            case PARTIALLY_PAID -> "Partial payment received. " + MoneyUtils.format(balanceDue)
+                    + " is still outstanding out of " + MoneyUtils.format(amount) + ".";
+            case OVERDUE -> "This bill is overdue. " + MoneyUtils.format(balanceDue) + " is outstanding.";
             case PENDING -> amountPaid.compareTo(BigDecimal.ZERO) > 0
                     ? "Payment is being processed."
-                    : "No payment has been made yet. KES " + amount + " is due.";
+                    : "No payment has been made yet. " + MoneyUtils.format(amount) + " is due.";
             case FAILED -> "The last payment attempt on this bill failed. Please try again.";
             case REFUNDED -> "This bill has been refunded.";
         };

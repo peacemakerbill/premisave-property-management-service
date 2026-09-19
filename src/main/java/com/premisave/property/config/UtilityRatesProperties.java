@@ -10,12 +10,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Binds KES-per-unit utility rates from application.yml, e.g.:
+ * Binds USD-per-unit utility rates from application.yml, e.g.:
  *
  * utility:
  *   rates:
- *     electricity: 20
- *     water: 200
+ *     electricity: 0.15
+ *     water: 1.50
  *
  * Only utility types with a configured rate can have bills auto-generated
  * from a meter reading; others require an explicit ratePerUnit override.

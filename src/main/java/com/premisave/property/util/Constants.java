@@ -2,7 +2,9 @@ package com.premisave.property.util;
 
 public class Constants {
 
-    public static final String DEFAULT_CURRENCY = "KES";
+    // Premisave wallets are USD-denominated, and property-service amounts are
+    // sent to wallet-service as-is, so every amount here is USD.
+    public static final String DEFAULT_CURRENCY = "USD";
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 100;
 

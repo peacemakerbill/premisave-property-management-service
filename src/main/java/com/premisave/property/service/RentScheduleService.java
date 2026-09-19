@@ -17,6 +17,7 @@ import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.RentScheduleRepository;
 import com.premisave.property.repository.RentalUnitRepository;
 import com.premisave.property.repository.TenantRepository;
+import com.premisave.property.util.MoneyUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -139,11 +140,11 @@ public class RentScheduleService {
                                         BigDecimal balanceDue, BigDecimal overpaidAmount) {
         return switch (status) {
             case PAID -> "This rent period has been paid in full.";
-            case OVERPAID -> "This rent period was overpaid by KES " + overpaidAmount
+            case OVERPAID -> "This rent period was overpaid by " + MoneyUtils.format(overpaidAmount)
                     + ". Please contact your property owner regarding a credit or refund.";
-            case PARTIALLY_PAID -> "Partial payment received. KES " + balanceDue + " is still outstanding.";
-            case OVERDUE -> "This rent period is overdue. KES " + balanceDue + " is outstanding.";
-            case PENDING -> "No payment has been made yet. KES " + amountDue + " is due.";
+            case PARTIALLY_PAID -> "Partial payment received. " + MoneyUtils.format(balanceDue) + " is still outstanding.";
+            case OVERDUE -> "This rent period is overdue. " + MoneyUtils.format(balanceDue) + " is outstanding.";
+            case PENDING -> "No payment has been made yet. " + MoneyUtils.format(amountDue) + " is due.";
             case FAILED -> "The last payment attempt for this period failed. Please try again.";
             case REFUNDED -> "This rent period's payment has been refunded.";
         };
