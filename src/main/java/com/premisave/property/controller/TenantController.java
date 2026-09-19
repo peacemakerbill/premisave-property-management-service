@@ -5,6 +5,8 @@ import com.premisave.property.dto.request.UpdateTenantRequest;
 import com.premisave.property.dto.response.ProfileSyncStatusResponse;
 import com.premisave.property.dto.response.TenantResponse;
 import com.premisave.property.service.TenantService;
+import com.premisave.property.health.ExternalService;
+import com.premisave.property.health.RequiresServices;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,8 @@ public class TenantController {
     // One-click registration — fullName/phoneNumber/email are pulled
     // straight from the user's auth-service account (via their own JWT),
     // no form to fill in.
+    @RequiresServices(value = ExternalService.AUTH,
+            action = "register you as a tenant", reassurance = "Nothing has been changed.")
     @PostMapping("/quick-register")
     public ResponseEntity<TenantResponse> quickRegisterTenant(HttpServletRequest httpRequest) {
         String userId = resolveUserId(httpRequest);
@@ -38,6 +42,8 @@ public class TenantController {
 
     // One-click sync — overwrites fullName/phoneNumber/email to match
     // whatever's currently on file in auth-service.
+    @RequiresServices(value = ExternalService.AUTH,
+            action = "sync your profile", reassurance = "Nothing has been changed.")
     @PostMapping("/me/sync")
     public ResponseEntity<TenantResponse> syncMyTenantProfile(HttpServletRequest httpRequest) {
         String userId = resolveUserId(httpRequest);
@@ -47,6 +53,8 @@ public class TenantController {
 
     // Lets the frontend decide whether to show a "your profile changed —
     // sync now?" prompt, without syncing unconditionally.
+    @RequiresServices(value = ExternalService.AUTH,
+            action = "check your profile", reassurance = "Nothing has been changed.")
     @GetMapping("/me/sync-status")
     public ResponseEntity<ProfileSyncStatusResponse> checkMyTenantSyncStatus(HttpServletRequest httpRequest) {
         String userId = resolveUserId(httpRequest);

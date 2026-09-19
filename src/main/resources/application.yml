@@ -68,6 +68,17 @@ listing-service:
 booking-service:
   url: ${BOOKING_SERVICE_URL:http://localhost:8083}
 
+# Availability checks for the services this one depends on. Endpoints marked @RequiresServices
+# answer 503 "service offline" up-front when auth-service / wallet-service can't be reached.
+# Any HTTP answer from the health path counts as online (except 502/503/504), so a missing or
+# protected path is fine. Set enabled=false to switch the checks off.
+service-health:
+  enabled: ${SERVICE_HEALTH_CHECKS_ENABLED:true}
+  auth:
+    path: ${AUTH_SERVICE_HEALTH_PATH:/health}
+  wallet:
+    path: ${WALLET_SERVICE_HEALTH_PATH:/system/health}
+
 # Internal API Key (must match Auth Service)
 app:
   api-key: ${INTERNAL_API_KEY:}

@@ -89,6 +89,24 @@
       "name": "utility.rates",
       "type": "java.util.Map<com.premisave.property.enums.UtilityType,java.math.BigDecimal>",
       "description": "Utility rates in USD charged per unit of metered consumption, keyed by utility type (e.g. utility.rates.electricity, utility.rates.water). Used to auto-generate bills from meter readings (UtilityBillingService). Utility types with no rate need an explicit ratePerUnit on the request."
+    },
+    {
+      "name": "service-health.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Turns the availability checks on auth-service and wallet-service on or off (ServiceHealthMonitor). When on, endpoints marked @RequiresServices answer 503 'service offline' before doing any work if a required service is unreachable.",
+      "defaultValue": true
+    },
+    {
+      "name": "service-health.auth.path",
+      "type": "java.lang.String",
+      "description": "Path on auth-service probed to decide whether it is online. Any HTTP answer except 502/503/504 counts as online, so the path may be protected or missing.",
+      "defaultValue": "/health"
+    },
+    {
+      "name": "service-health.wallet.path",
+      "type": "java.lang.String",
+      "description": "Path on wallet-service probed to decide whether it is online. Any HTTP answer except 502/503/504 counts as online, so the path may be protected or missing.",
+      "defaultValue": "/system/health"
     }
   ]
 }

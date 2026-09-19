@@ -18,7 +18,11 @@ import com.premisave.property.enums.WalletTransferStatus;
 import com.premisave.property.exception.BadRequestException;
 import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
+import com.premisave.property.exception.ServiceOfflineException;
 import com.premisave.property.exception.WalletServiceException;
+import com.premisave.property.health.ExternalService;
+import com.premisave.property.health.FeignFailures;
+import com.premisave.property.health.ServiceHealthMonitor;
 import com.premisave.property.repository.OwnerRepository;
 import com.premisave.property.repository.PropertyRepository;
 import com.premisave.property.repository.TenantRepository;
@@ -74,6 +78,7 @@ public class WalletPaymentService {
     private final OwnerRepository ownerRepository;
     private final ObjectMapper objectMapper;
     private final PaymentNotificationService paymentNotificationService;
+    private final ServiceHealthMonitor healthMonitor;
 
     @Value("${app.api-key}")
     private String internalApiKey;
@@ -197,7 +202,7 @@ public class WalletPaymentService {
         return new WalletServiceException(
                 "Your wallet was debited but we couldn't finish recording the payment. Retry the same request "
                         + "with reference \"" + clientFacingReference(transfer.getReference())
-                        + "\" to complete it — you will not be charged twice.", cause);
+                        + "\" to complete it — you will not be charged twice.", "PAYMENT_NOT_RECORDED", cause);
     }
 
     // ------------------------------------------------------------------
@@ -259,11 +264,17 @@ public class WalletPaymentService {
         } catch (FeignException.NotFound e) {
             throw new BadRequestException("The property owner's account could not be found");
         } catch (FeignException e) {
+            if (FeignFailures.looksOffline(e)) {
+                healthMonitor.markDown(ExternalService.AUTH);
+                throw new ServiceOfflineException(ExternalService.AUTH, "process payments", "Nothing has been charged.");
+            }
+            // auth-service is up but failed this lookup — e.g. it rejected OUR api key (401/403) or errored.
+            // The payment can't proceed and nothing has moved.
             log.error("auth-service lookup for owner user {} failed (HTTP {}): {}",
                     owner.getUserId(), e.status(), e.getMessage());
             throw new WalletServiceException(
-                    "Couldn't look up the property owner's wallet account right now. "
-                            + "No money was moved — please try again.");
+                    "We can't process payments right now. No money was taken from your wallet. "
+                            + "Please try again later.", "PAYMENT_SERVICE_ERROR");
         }
         if (ownerUser == null || ownerUser.getEmail() == null || ownerUser.getEmail().isBlank()) {
             throw new BadRequestException("The property owner has no wallet account on file");
@@ -326,13 +337,24 @@ public class WalletPaymentService {
     private RuntimeException handleFeignFailure(WalletTransfer transfer, FeignException e) {
         int status = e.status();
 
+        // The request never reached wallet-service (connection refused, unknown host, connect timeout):
+        // nothing was sent, so nothing moved. Keep the record INITIATED so a retry with the same
+        // reference simply sends it again.
+        if (FeignFailures.neverReached(e)) {
+            log.warn("wallet-service unreachable for transfer {}: {}", transfer.getReference(), e.getMessage());
+            healthMonitor.markDown(ExternalService.WALLET);
+            release(transfer, WalletTransferStatus.INITIATED, null);
+            return new ServiceOfflineException(ExternalService.WALLET, "process payments", "Nothing has been charged.");
+        }
+
         // wallet-service auth problem — nothing moved; this is our misconfiguration.
         if (status == 401 || status == 403) {
             log.error("wallet-service rejected our service credentials (HTTP {}). "
                     + "Check INTERNAL_API_KEY matches on both services.", status);
             release(transfer, WalletTransferStatus.FAILED, "Payment service authentication failed");
             return new WalletServiceException(
-                    "The payment service is temporarily unavailable. No money was moved — please try again later.");
+                    "We can't process payments right now. No money was taken from your wallet. "
+                            + "Please try again later.", "PAYMENT_SERVICE_ERROR");
         }
 
         // Definitive rejection (insufficient funds, unknown recipient, validation...) — nothing moved.
@@ -358,9 +380,9 @@ public class WalletPaymentService {
 
     private WalletServiceException outcomeUnknown(WalletTransfer transfer, Throwable cause) {
         return new WalletServiceException(
-                "We couldn't confirm this payment with the wallet service. If your wallet was debited, retry the "
-                        + "same request with reference \"" + clientFacingReference(transfer.getReference())
-                        + "\" to complete it — you will not be charged twice.", cause);
+                "We couldn't confirm your payment with the Premisave wallet. If your wallet was debited, retry "
+                        + "the same request with reference \"" + clientFacingReference(transfer.getReference())
+                        + "\" to complete it — you will not be charged twice.", "PAYMENT_UNCONFIRMED", cause);
     }
 
     /** Sets a status and releases the in-flight lock. */

@@ -12,8 +12,11 @@ import com.premisave.property.entity.Tenant;
 import com.premisave.property.exception.BadRequestException;
 import com.premisave.property.exception.ConflictException;
 import com.premisave.property.exception.ResourceNotFoundException;
+import com.premisave.property.health.ExternalService;
+import com.premisave.property.health.FeignFailures;
 import com.premisave.property.repository.TenantRepository;
 
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -154,7 +157,14 @@ public class TenantService {
      * internal API key.
      */
     private UserDto fetchAuthUser(String authHeader) {
-        UserDto authUser = authServiceClient.getMyProfile(authHeader);
+        UserDto authUser;
+        try {
+            authUser = authServiceClient.getMyProfile(authHeader);
+        } catch (FeignException e) {
+            // Offline => friendly 503 (nothing has been saved yet); 401/403 => sign in again.
+            throw FeignFailures.toServiceException(e, ExternalService.AUTH,
+                    "verify your account", "Nothing has been changed.");
+        }
         if (authUser == null) {
             throw new ResourceNotFoundException("User account not found in auth service");
         }

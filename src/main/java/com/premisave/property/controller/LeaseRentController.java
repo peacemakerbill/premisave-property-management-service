@@ -5,6 +5,8 @@ import com.premisave.property.dto.response.LeaseRentPaymentResponse;
 import com.premisave.property.dto.response.PaymentDueResponse;
 import com.premisave.property.service.LeaseRentUnitPaymentService;
 import com.premisave.property.service.TenantService;
+import com.premisave.property.health.ExternalService;
+import com.premisave.property.health.RequiresServices;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,8 @@ public class LeaseRentController {
         return ResponseEntity.ok(leaseRentUnitPaymentService.getPaymentDue(leaseId));
     }
 
+    @RequiresServices(value = {ExternalService.WALLET, ExternalService.AUTH},
+            action = "process payments", reassurance = "Nothing has been charged.")
     @PostMapping("/pay")
     public ResponseEntity<LeaseRentPaymentResponse> payRent(@Valid @RequestBody LeaseRentPaymentRequest request,
                                                               HttpServletRequest httpRequest) {

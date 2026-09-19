@@ -6,6 +6,8 @@ import com.premisave.property.dto.request.UtilityBillRequest;
 import com.premisave.property.dto.response.UtilityBillResponse;
 import com.premisave.property.service.TenantService;
 import com.premisave.property.service.UtilityBillingService;
+import com.premisave.property.health.ExternalService;
+import com.premisave.property.health.RequiresServices;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,8 @@ public class UtilityBillController {
 
     // Paid from the calling tenant's wallet — the tenant comes from the JWT,
     // never from the request body.
+    @RequiresServices(value = {ExternalService.WALLET, ExternalService.AUTH},
+            action = "process payments", reassurance = "Nothing has been charged.")
     @PostMapping("/pay")
     public ResponseEntity<UtilityBillResponse> payBill(@Valid @RequestBody PayUtilityBillRequest request,
                                                          HttpServletRequest httpRequest) {
