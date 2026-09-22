@@ -70,13 +70,21 @@ public class WalletPaymentService {
             "This payment is already being processed. Please wait a few seconds and check your "
                     + "payment history before retrying.";
 
+    // A plain, unmanaged Jackson 2 ObjectMapper — used only to peek at the "message"/"error"
+    // field of a wallet-service error body in extractMessage() below. Spring Boot 4 defaults to
+    // Jackson 3 (tools.jackson) and no longer auto-configures a com.fasterxml.jackson.databind
+    // ObjectMapper bean, so this can't be constructor-injected the way it could under Boot 3.
+    // Constructing our own here needs nothing from Spring: this is a narrow, ad hoc parse, not
+    // the app's HTTP message conversion, so none of Spring's Jackson customization applies to it
+    // anyway.
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final WalletServiceClient walletServiceClient;
     private final AuthServiceClient authServiceClient;
     private final WalletTransferRepository walletTransferRepository;
     private final TenantRepository tenantRepository;
     private final PropertyRepository propertyRepository;
     private final OwnerRepository ownerRepository;
-    private final ObjectMapper objectMapper;
     private final PaymentNotificationService paymentNotificationService;
     private final ServiceHealthMonitor healthMonitor;
 
@@ -401,7 +409,7 @@ public class WalletPaymentService {
         try {
             String body = e.contentUTF8();
             if (body != null && !body.isBlank()) {
-                JsonNode node = objectMapper.readTree(body);
+                JsonNode node = OBJECT_MAPPER.readTree(body);
                 for (String field : List.of("message", "error")) {
                     JsonNode value = node.get(field);
                     if (value != null && value.isTextual() && !value.asText().isBlank()) {

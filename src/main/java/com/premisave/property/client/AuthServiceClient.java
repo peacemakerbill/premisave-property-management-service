@@ -22,12 +22,6 @@ import java.util.Map;
 )
 public interface AuthServiceClient {
 
-    // ── Internal (API-key protected) ──────────────────────────────
-    // Retained for other internal cross-service lookups (e.g. by userId/email
-    // outside a user request context). NOT used for owner/tenant profile
-    // sync anymore — see getMyProfile() below, which forwards the caller's
-    // own JWT instead.
-
     @GetMapping("/internal/users/{userId}")
     UserDto getUserById(@PathVariable String userId,
                         @RequestHeader("X-API-Key") String apiKey);
@@ -36,15 +30,6 @@ public interface AuthServiceClient {
     UserDto getUserByEmail(@PathVariable String email,
                            @RequestHeader("X-API-Key") String apiKey);
 
-    // ── Profile (user-JWT protected — forward Authorization header) ──
-
-    /**
-     * Fetch the profile of whoever the forwarded JWT belongs to.
-     * Used by OwnerService/TenantService for quick-create, sync, and
-     * sync-status flows instead of the internal API-key endpoint —
-     * this way auth-service enforces its own auth on the request rather
-     * than trusting a shared secret.
-     */
     @GetMapping("/profile/me")
     UserDto getMyProfile(@RequestHeader("Authorization") String authHeader);
 
@@ -52,19 +37,10 @@ public interface AuthServiceClient {
     UserDto getUserPublicProfile(@PathVariable String userId,
                                   @RequestHeader("Authorization") String authHeader);
 
-    /**
-     * Raw Feign binding — do not call directly, auth-service returns 400
-     * on blank/missing query. Use {@link #searchUsers(String, String)} instead.
-     */
     @GetMapping("/profile/search")
-    List<UserDto> searchUsersRaw(@RequestParam("query") String query,
+    List<UserDto> searchUsersRaw(@RequestParam String query,
                                   @RequestHeader("Authorization") String authHeader);
 
-    /**
-     * Search users by name, username, email, etc.
-     * Returns an empty list for null/blank query instead of letting
-     * auth-service's 400 surface as an unhandled FeignException.
-     */
     default List<UserDto> searchUsers(String query, String authHeader) {
         if (query == null || query.trim().isEmpty()) {
             return List.of();
@@ -74,8 +50,6 @@ public interface AuthServiceClient {
 
     @GetMapping("/profile/all")
     List<UserDto> getAllUsers(@RequestHeader("Authorization") String authHeader);
-
-    // ── Profile Views (user-JWT protected) ──────────────────────────
 
     @PostMapping("/profile/views/{targetId}")
     ProfileViewResponse recordProfileView(@PathVariable String targetId,
@@ -96,8 +70,6 @@ public interface AuthServiceClient {
     @GetMapping("/profile/views/stats/{userId}")
     PublicProfileViewStats getUserViewStats(@PathVariable String userId,
                                              @RequestHeader("Authorization") String authHeader);
-
-    // ── Social (user-JWT protected) ──────────────────────────────────
 
     @PostMapping("/social/like")
     SocialActionResponse likeUser(@RequestBody SocialActionRequest request,

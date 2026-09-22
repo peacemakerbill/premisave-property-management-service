@@ -19,20 +19,20 @@ public class WalletServiceFeignConfig {
     private String internalApiKey;
 
     @Bean
-    public RequestInterceptor walletServiceApiKeyInterceptor() {
+    RequestInterceptor walletServiceApiKeyInterceptor() {
         return requestTemplate -> requestTemplate.header("X-API-Key", internalApiKey);
     }
 
     // Fail fast on connect; allow a realistic read window for a money movement.
     @Bean
-    public Request.Options walletServiceRequestOptions() {
+    Request.Options walletServiceRequestOptions() {
         return new Request.Options(5, TimeUnit.SECONDS, 20, TimeUnit.SECONDS, true);
     }
 
     // Money movements must never be retried implicitly by the HTTP client —
     // retries are decided by WalletPaymentService using the idempotency reference.
     @Bean
-    public Retryer walletServiceRetryer() {
+    Retryer walletServiceRetryer() {
         return Retryer.NEVER_RETRY;
     }
 }

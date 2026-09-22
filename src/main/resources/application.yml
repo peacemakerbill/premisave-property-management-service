@@ -2,9 +2,10 @@ spring:
   application:
     name: premisave-property-management-service
 
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/premisave-property}
+
   data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/premisave-property}
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
@@ -97,7 +98,7 @@ notifications:
     support-address: ${SUPPORT_EMAIL:support@premisave.com}
 
 # Utility billing rates (USD charged per unit of metered consumption).
-# NOTE: these were KES amounts before the currency moved to USD (wallets are USD).
+# these were KES amounts before the currency moved to USD (wallets are USD).
 # 20 and 200 would now mean USD 20 per kWh — set real USD rates via the env vars.
 utility:
   rates:
@@ -111,3 +112,6 @@ logging:
     "[org.springframework.cloud.openfeign]": DEBUG
     "[org.springframework.data.mongodb]": INFO
     "[org.springframework.amqp]": WARN
+    # Mutes SpringDoc's one-time "enabled by default" boot reminders for /v3/api-docs and
+    # /swagger-ui.html — those endpoints keep working, only the log line goes away.
+    "[org.springdoc]": ERROR
