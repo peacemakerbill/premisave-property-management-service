@@ -49,7 +49,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#how-a-rent-payment-works">How a rent payment works</a> ·
-  <a href="#service-availability-resilience">Service availability</a> ·
+  <a href="#service-availability-and-resilience">Service availability</a> ·
   <a href="#api-reference">API reference</a> ·
   <a href="#configuration-reference">Configuration</a> ·
   <a href="#troubleshooting">Troubleshooting</a>
@@ -67,7 +67,7 @@
 2. [Features](#features)
 3. [Architecture](#architecture)
 4. [How a rent payment works](#how-a-rent-payment-works)
-5. [Service availability & resilience](#service-availability-resilience)
+5. [Service availability and resilience](#service-availability-and-resilience)
 6. [Currency and payment model](#currency-and-payment-model)
 7. [Quick start](#quick-start)
 8. [Build and run](#build-and-run)
@@ -167,7 +167,7 @@ sequenceDiagram
 
 If the wallet service can't be reached, or the transfer's outcome can't be confirmed, the request fails **before** any local record is booked — the response tells the tenant plainly that nothing was charged, or gives back the same `reference` to safely retry. The same shape covers direct-unit rent payments and utility bill payments, against a running balance and a bill's paid-so-far total respectively, instead of a generated schedule.
 
-## Service availability & resilience
+## Service availability and resilience
 
 Every endpoint that depends on auth-service or the wallet service is annotated to declare that dependency. Before the request does anything else, a background health monitor's cached status is checked:
 
