@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=1A3C34&height=240&section=header&text=Premisave%20Property%20Service&fontSize=52&fontColor=ffffff&fontAlignY=34&desc=Core%20property%2C%20lease%2C%20tenant%20%26%20rent%20management%20microservice&descSize=18&descAlignY=58&animation=fadeIn" alt="Premisave Property Management Service - property, lease, tenant and rent management microservice banner" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&amp;color=1A3C34&amp;height=240&amp;section=header&amp;text=Premisave%20Property%20Service&amp;fontSize=52&amp;fontColor=ffffff&amp;fontAlignY=34&amp;desc=Property%20lease%20tenant%20and%20rent%20management%20microservice&amp;descSize=18&amp;descAlignY=58&amp;animation=fadeIn" alt="Premisave Property Service - property, lease, tenant and rent management microservice banner" />
 </p>
 
 <h1 align="center">Premisave Property Management Service: Property, Lease &amp; Rent Management API</h1>
@@ -10,21 +10,21 @@
 
 <p align="center">
   <a href="https://github.com/peacemakerbill">
-    <img src="https://avatars.githubusercontent.com/u/262163756?v=4&s=200" width="110" height="110" alt="Bill Graham Peacemaker (peacemakerbill) GitHub profile picture" />
+    <img src="https://avatars.githubusercontent.com/u/262163756?v=4&amp;s=200" width="110" height="110" alt="Bill Graham Peacemaker (peacemakerbill) GitHub profile picture" />
   </a>
   <br/>
   <sub>Built by <a href="https://github.com/peacemakerbill"><b>Bill Graham Peacemaker</b></a> (<code>@peacemakerbill</code>) · Backend Developer &amp; API Support Engineer · Nairobi, Kenya</sub>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 21" />
-  <img src="https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" alt="Spring Boot 4.1.1" />
-  <img src="https://img.shields.io/badge/Spring_Framework-7.0.9-6DB33F?style=for-the-badge&logo=spring&logoColor=white" alt="Spring Framework 7" />
-  <img src="https://img.shields.io/badge/Spring_Security-7-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white" alt="Spring Security 7" />
-  <img src="https://img.shields.io/badge/MongoDB-Spring_Data-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB with Spring Data" />
-  <img src="https://img.shields.io/badge/Redis-Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis cache" />
-  <img src="https://img.shields.io/badge/RabbitMQ-AMQP-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white" alt="RabbitMQ" />
-  <img src="https://img.shields.io/badge/Maven-Build-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white" alt="Apache Maven" />
+  <img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&amp;logo=openjdk&amp;logoColor=white" alt="Java 21" />
+  <img src="https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?style=for-the-badge&amp;logo=springboot&amp;logoColor=white" alt="Spring Boot 4.1.1" />
+  <img src="https://img.shields.io/badge/Spring_Framework-7.0.9-6DB33F?style=for-the-badge&amp;logo=spring&amp;logoColor=white" alt="Spring Framework 7" />
+  <img src="https://img.shields.io/badge/Spring_Security-7-6DB33F?style=for-the-badge&amp;logo=springsecurity&amp;logoColor=white" alt="Spring Security 7" />
+  <img src="https://img.shields.io/badge/MongoDB-Spring_Data-47A248?style=for-the-badge&amp;logo=mongodb&amp;logoColor=white" alt="MongoDB with Spring Data" />
+  <img src="https://img.shields.io/badge/Redis-Cache-DC382D?style=for-the-badge&amp;logo=redis&amp;logoColor=white" alt="Redis cache" />
+  <img src="https://img.shields.io/badge/RabbitMQ-AMQP-FF6600?style=for-the-badge&amp;logo=rabbitmq&amp;logoColor=white" alt="RabbitMQ" />
+  <img src="https://img.shields.io/badge/Maven-Build-C71A36?style=for-the-badge&amp;logo=apachemaven&amp;logoColor=white" alt="Apache Maven" />
 </p>
 
 <p align="center">
@@ -32,12 +32,12 @@
   <img src="https://img.shields.io/badge/Rent_%26_Utility_Billing-USD-C9A84C?style=for-the-badge" alt="Rent and utility billing in USD" />
   <img src="https://img.shields.io/badge/Payments-via_Wallet_Service-635BFF?style=for-the-badge" alt="Payments settled via the wallet service" />
   <img src="https://img.shields.io/badge/OpenFeign-Service_to_Service-6DB33F?style=for-the-badge" alt="OpenFeign service-to-service calls" />
-  <img src="https://img.shields.io/badge/OpenAPI-3-85EA2D?style=for-the-badge&logo=swagger&logoColor=white" alt="OpenAPI 3 / Swagger UI" />
+  <img src="https://img.shields.io/badge/OpenAPI-3-85EA2D?style=for-the-badge&amp;logo=swagger&amp;logoColor=white" alt="OpenAPI 3 / Swagger UI" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/peacemakerbill/premisave-property-management-service/stargazers"><img src="https://img.shields.io/github/stars/peacemakerbill/premisave-property-management-service?style=for-the-badge&logo=github" alt="GitHub stars" /></a>
-  <a href="https://github.com/peacemakerbill/premisave-property-management-service/network/members"><img src="https://img.shields.io/github/forks/peacemakerbill/premisave-property-management-service?style=for-the-badge&logo=github" alt="GitHub forks" /></a>
+  <a href="https://github.com/peacemakerbill/premisave-property-management-service/stargazers"><img src="https://img.shields.io/github/stars/peacemakerbill/premisave-property-management-service?style=for-the-badge&amp;logo=github" alt="GitHub stars" /></a>
+  <a href="https://github.com/peacemakerbill/premisave-property-management-service/network/members"><img src="https://img.shields.io/github/forks/peacemakerbill/premisave-property-management-service?style=for-the-badge&amp;logo=github" alt="GitHub forks" /></a>
   <a href="https://github.com/peacemakerbill/premisave-property-management-service/issues"><img src="https://img.shields.io/github/issues/peacemakerbill/premisave-property-management-service?style=for-the-badge" alt="Open issues" /></a>
   <a href="https://github.com/peacemakerbill/premisave-property-management-service/commits"><img src="https://img.shields.io/github/last-commit/peacemakerbill/premisave-property-management-service?style=for-the-badge" alt="Last commit" /></a>
   <img src="https://img.shields.io/github/repo-size/peacemakerbill/premisave-property-management-service?style=for-the-badge" alt="Repository size" />
@@ -113,9 +113,9 @@ It was built for the Premisave platform's own microservice ecosystem (alongside 
 | **Security deposits with partial refunds** | Deposits are held once per tenancy, with a running refund history; a partial refund requires a reason, a final refund closes the deposit out. |
 | **Utility billing from meter readings** | A meter reading can auto-generate a bill using a configured per-unit rate, with duplicate-reading and duplicate-bill guards. |
 | **Maintenance to work order pipeline** | A tenant's maintenance request can be turned into an assigned work order, with status kept in sync in both directions. |
-| **Bulk & scheduled notices** | Rent reminders and other notices can be sent to many units/leases at once, immediately or at a future time, with per-recipient delivery results and a 24-hour duplicate-notice guard. |
+| **Bulk and scheduled notices** | Rent reminders and other notices can be sent to many units/leases at once, immediately or at a future time, with per-recipient delivery results and a 24-hour duplicate-notice guard. |
 | **Designed HTML email notifications** | Payment receipts, deposit and refund notices, utility bills, failed-payment alerts, and owner-written notices are all sent as branded HTML (Thymeleaf) with a plain-text fallback — no plain default Spring emails. |
-| **Owner & tenant "quick" onboarding** | One-click profile creation that pulls name/phone/email straight from the caller's own auth-service account, plus a sync-status check so the frontend can prompt "your profile changed — sync now?". |
+| **Owner and tenant "quick" onboarding** | One-click profile creation that pulls name/phone/email straight from the caller's own auth-service account, plus a sync-status check so the frontend can prompt "your profile changed — sync now?". |
 | **Dual authentication model** | JWT for end users (via a shared secret with auth-service), a shared internal API key for service-to-service calls from the rest of the Premisave ecosystem. |
 | **OpenAPI 3 documentation** | Full API spec generation via springdoc-openapi. |
 
@@ -634,7 +634,7 @@ Found a bug or have an integration question? [Open an issue](https://github.com/
   <tr>
     <td align="center" width="180">
       <a href="https://github.com/peacemakerbill">
-        <img src="https://avatars.githubusercontent.com/u/262163756?v=4&s=160" width="120" height="120" alt="Bill Graham Peacemaker, GitHub @peacemakerbill" /><br/>
+        <img src="https://avatars.githubusercontent.com/u/262163756?v=4&amp;s=160" width="120" height="120" alt="Bill Graham Peacemaker, GitHub @peacemakerbill" /><br/>
         <sub><b>Bill Graham Peacemaker</b></sub>
       </a>
     </td>
@@ -642,8 +642,8 @@ Found a bug or have an integration question? [Open an issue](https://github.com/
       <b>Backend Developer &amp; API Support Engineer at Safaricom PLC</b><br/>
       Nairobi, Kenya<br/><br/>
       Enterprise systems developer and API integration specialist, working across backend microservices (Java/Spring Boot), Flutter frontends, and DevOps — with deep, hands-on production and personal-project experience in Safaricom's M-Pesa Daraja APIs.<br/><br/>
-      <a href="https://github.com/peacemakerbill"><img src="https://img.shields.io/badge/GitHub-@peacemakerbill-181717?style=for-the-badge&logo=github" alt="GitHub @peacemakerbill" /></a>
-      <a href="https://github.com/peacemakerbill?tab=followers"><img src="https://img.shields.io/github/followers/peacemakerbill?style=for-the-badge&logo=github&label=Followers" alt="GitHub followers" /></a>
+      <a href="https://github.com/peacemakerbill"><img src="https://img.shields.io/badge/GitHub-@peacemakerbill-181717?style=for-the-badge&amp;logo=github" alt="GitHub @peacemakerbill" /></a>
+      <a href="https://github.com/peacemakerbill?tab=followers"><img src="https://img.shields.io/github/followers/peacemakerbill?style=for-the-badge&amp;logo=github&amp;label=Followers" alt="GitHub followers" /></a>
       <br/><br/>
       More from me: <a href="https://github.com/peacemakerbill/premisave-wallet-service">premisave-wallet-service</a> ·
       <a href="https://github.com/peacemakerbill/premisave-c2b-hakikisha-service-m-pesa">premisave-c2b-hakikisha-service-m-pesa</a> ·
@@ -656,8 +656,8 @@ Found a bug or have an integration question? [Open an issue](https://github.com/
 
 ### Star history
 
-<a href="https://star-history.com/#peacemakerbill/premisave-property-management-service&Date">
-  <img src="https://api.star-history.com/svg?repos=peacemakerbill/premisave-property-management-service&type=Date" alt="Star history chart for premisave-property-management-service" width="600" />
+<a href="https://star-history.com/#peacemakerbill/premisave-property-management-service&amp;Date">
+  <img src="https://api.star-history.com/svg?repos=peacemakerbill/premisave-property-management-service&amp;type=Date" alt="Star history chart for premisave-property-management-service" width="600" />
 </a>
 
 ---
