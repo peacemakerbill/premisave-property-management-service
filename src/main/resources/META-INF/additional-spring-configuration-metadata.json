@@ -3,7 +3,7 @@
     {
       "name": "jwt.secret",
       "type": "java.lang.String",
-      "description": "Base64-encoded secret key used to sign and verify JWTs. Must match the value used by auth-service."
+      "description": "Base64-encoded secret key used to sign and verify JWTs. Must match the value used by auth-service. Required: the service refuses to start without it."
     },
     {
       "name": "jwt.expiration",
@@ -38,7 +38,7 @@
     {
       "name": "app.api-key",
       "type": "java.lang.String",
-      "description": "Internal API key sent as the X-API-Key header on service-to-service calls: to wallet-service /internal/** endpoints (WalletServiceFeignConfig) and to auth-service internal lookups. Must match auth-service's key and wallet-service's internal.api-key (INTERNAL_API_KEY). No default: if it is blank, those calls are rejected with 401."
+      "description": "Internal API key sent as the X-API-Key header on service-to-service calls: to wallet-service /internal/** endpoints (WalletServiceFeignConfig) and to auth-service internal lookups. Must match auth-service's key and wallet-service's internal.api-key (INTERNAL_API_KEY). Required: the service refuses to start without it."
     },
     {
       "name": "frontend.url",
@@ -86,6 +86,18 @@
       "type": "java.lang.String",
       "description": "Path on wallet-service probed to decide whether it is online. Any HTTP answer except 502/503/504 counts as online, so the path may be protected or missing.",
       "defaultValue": "/system/health"
+    },
+    {
+      "name": "cors.allowed-origins",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Browser origins allowed to call this API (CORS_ALLOWED_ORIGINS, comma separated). A single * allows every origin and turns credentials off; use it only for local experiments.",
+      "defaultValue": "http://localhost:3000,http://localhost:4200,http://localhost:5173"
+    },
+    {
+      "name": "system.test-token-enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enables GET /system/test-token, which decodes a JWT and returns its claims. Leave off outside development.",
+      "defaultValue": false
     }
   ]
 }

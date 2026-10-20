@@ -4,6 +4,8 @@ import com.premisave.property.dto.request.CompleteInspectionRequest;
 import com.premisave.property.dto.request.CreateInspectionRequest;
 import com.premisave.property.dto.response.InspectionResponse;
 import com.premisave.property.enums.InspectionStatus;
+import com.premisave.property.exception.ForbiddenException;
+import com.premisave.property.security.AccessGuard;
 import com.premisave.property.service.InspectionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -20,11 +22,13 @@ import java.util.List;
 public class InspectionController {
 
     private final InspectionService inspectionService;
+    private final AccessGuard guard;
 
     @PostMapping
     @PreAuthorize("hasRole('HOME_OWNER')")
     public ResponseEntity<InspectionResponse> createInspection(@Valid @RequestBody CreateInspectionRequest request,
                                                                   HttpServletRequest httpRequest) {
+        guard.requireUnitManager(request.getRentalUnitId());
         String createdByUserId = (String) httpRequest.getAttribute("userId");
         return ResponseEntity.ok(inspectionService.createInspection(request, createdByUserId));
     }
@@ -46,12 +50,14 @@ public class InspectionController {
 
     @GetMapping("/{id}")
     public ResponseEntity<InspectionResponse> getInspection(@PathVariable String id) {
+        guard.requireInspectionViewer(id);
         return ResponseEntity.ok(inspectionService.getInspection(id));
     }
 
     @GetMapping("/unit/{rentalUnitId}")
     @PreAuthorize("hasRole('HOME_OWNER')")
     public ResponseEntity<List<InspectionResponse>> getInspectionsByUnit(@PathVariable String rentalUnitId) {
+        guard.requireUnitManager(rentalUnitId);
         return ResponseEntity.ok(inspectionService.getInspectionsByUnit(rentalUnitId));
     }
 
@@ -59,6 +65,10 @@ public class InspectionController {
     public ResponseEntity<List<InspectionResponse>> getInspectionsByInspector(@PathVariable String inspectorUserId,
                                                                                 HttpServletRequest httpRequest) {
         String callerUserId = (String) httpRequest.getAttribute("userId");
+        // An inspector sees their own assignments. Owners use /created-by or /me for what they scheduled.
+        if (!guard.isAdmin() && !inspectorUserId.equals(callerUserId)) {
+            throw new ForbiddenException("You can only view your own assigned inspections");
+        }
         return ResponseEntity.ok(inspectionService.getInspectionsByInspector(inspectorUserId, callerUserId));
     }
 

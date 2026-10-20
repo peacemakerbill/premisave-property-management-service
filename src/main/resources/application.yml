@@ -88,6 +88,15 @@ app:
 frontend:
   url: ${FRONTEND_URL:http://localhost:3000}
 
+# Browser origins allowed to call this API (comma separated). Set CORS_ALLOWED_ORIGINS to the real
+# frontend address(es) when deploying. The defaults cover local development only.
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:4200,http://localhost:5173}
+
+# GET /system/test-token decodes a JWT and returns its claims. Off unless explicitly switched on.
+system:
+  test-token-enabled: ${SYSTEM_TEST_TOKEN_ENABLED:false}
+
 # Notice delivery
 notifications:
   email:
@@ -97,19 +106,19 @@ notifications:
     # Shown in every email footer as the "Questions?" contact.
     support-address: ${SUPPORT_EMAIL:support@premisave.com}
 
-# Utility billing rates (USD charged per unit of metered consumption).
-# these were KES amounts before the currency moved to USD (wallets are USD).
-# 20 and 200 would now mean USD 20 per kWh — set real USD rates via the env vars.
+# Utility billing rates: USD charged per unit of metered consumption (per kWh, per cubic metre).
+# Starting points only. Set the real rates with UTILITY_RATE_ELECTRICITY and UTILITY_RATE_WATER.
 utility:
   rates:
-    electricity: ${UTILITY_RATE_ELECTRICITY:20}
-    water: ${UTILITY_RATE_WATER:200}
+    electricity: ${UTILITY_RATE_ELECTRICITY:0.15}
+    water: ${UTILITY_RATE_WATER:1.50}
 
 # ── Logging ──
 logging:
   level:
-    "[com.premisave.property]": DEBUG
-    "[org.springframework.cloud.openfeign]": DEBUG
+    # Set LOG_LEVEL=DEBUG while developing. DEBUG on a payments service is too chatty to leave on.
+    "[com.premisave.property]": ${LOG_LEVEL:INFO}
+    "[org.springframework.cloud.openfeign]": INFO
     "[org.springframework.data.mongodb]": INFO
     "[org.springframework.amqp]": WARN
     # Mutes SpringDoc's one-time "enabled by default" boot reminders for /v3/api-docs and

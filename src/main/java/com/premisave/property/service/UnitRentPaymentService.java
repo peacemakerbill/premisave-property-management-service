@@ -172,13 +172,19 @@ public class UnitRentPaymentService {
         // ---- Move the money: tenant wallet -> property owner's wallet --------------------------
         WalletTransfer transfer = walletPaymentService.collect(new WalletPaymentService.CollectionCommand(
                 reference, tenantId, unit.getPropertyId(), WalletTransferPurpose.UNIT_RENT, unit.getId(),
-                request.getAmount(), "Rent payment for " + locationSummary(unit, property)));
+                request.getAmount(), "Rent payment for " + locationSummary(unit, property),
+                depositToApply, rentPortion));
 
         // ---- Book it ---------------------------------------------------------------------------
+        // On a retry the split saved with the transfer wins: the first attempt may already have
+        // held the deposit, which would make a fresh calculation send the whole amount to rent.
+        BigDecimal bookDeposit = transfer.getDepositPortion() != null ? transfer.getDepositPortion() : depositToApply;
+        BigDecimal bookRent = transfer.getRentPortion() != null ? transfer.getRentPortion() : rentPortion;
+
         UnitBooking booking;
         try {
             booking = bookUnitPayment(unit, tenantId, request.getAmount(), transfer.getReference(),
-                    depositToApply, rentPortion);
+                    bookDeposit, bookRent);
         } catch (RuntimeException e) {
             throw walletPaymentService.bookingFailed(transfer, e);
         }
@@ -210,56 +216,87 @@ public class UnitRentPaymentService {
     /**
      * Local booking once the money has moved: hold the deposit portion, apply the
      * rent portion to the running RentBalance, and save the payment record.
+     *
+     * MongoDB has no transaction here, so this is all-or-nothing by hand: if any step fails,
+     * the balance and any deposit this attempt created are put back before the error goes
+     * out, and a retry with the same reference starts from the same state. A deposit that is
+     * already held (by an earlier attempt that could not be rolled back) is kept, never held twice.
      */
     private UnitBooking bookUnitPayment(RentalUnit unit, String tenantId, BigDecimal amount, String reference,
                                          BigDecimal depositToApply, BigDecimal rentPortion) {
         BigDecimal depositApplied = BigDecimal.ZERO;
+        String depositCreatedHere = null;
+        RentBalance balanceBefore = null;
 
-        if (depositToApply.compareTo(BigDecimal.ZERO) > 0) {
-            SecurityDepositRequest depositRequest = new SecurityDepositRequest();
-            depositRequest.setRentalUnitId(unit.getId());
-            depositRequest.setTenantId(tenantId);
-            depositRequest.setAmount(depositToApply);
-            securityDepositService.holdDeposit(depositRequest);
-            depositApplied = depositToApply;
+        try {
+            if (depositToApply.compareTo(BigDecimal.ZERO) > 0) {
+                if (!securityDepositService.hasActiveDeposit(unit.getId(), tenantId)) {
+                    SecurityDepositRequest depositRequest = new SecurityDepositRequest();
+                    depositRequest.setRentalUnitId(unit.getId());
+                    depositRequest.setTenantId(tenantId);
+                    depositRequest.setAmount(depositToApply);
+                    depositCreatedHere = securityDepositService.holdDeposit(depositRequest).getId();
+                }
+                depositApplied = depositToApply;
+            }
+
+            PaymentStatus status;
+            BigDecimal balanceAfter;
+
+            if (rentPortion.compareTo(BigDecimal.ZERO) > 0) {
+                RentBalance balance = rentBalanceService.findOrCreateUnitBalance(
+                        unit.getId(), tenantId, unit.getPropertyId());
+                balanceBefore = rentBalanceService.snapshot(balance);
+
+                rentBalanceService.chargeElapsedMonthsIfNeeded(balance, unit.getRentAmount());
+                rentBalanceService.applyPayment(balance, rentPortion);
+
+                balanceAfter = balance.getBalance();
+                status = resolveStatus(balanceAfter);
+            } else {
+                // The entire payment went to the deposit — no rent portion to apply.
+                balanceAfter = rentBalanceService.getUnitBalance(unit.getId(), tenantId).getBalance();
+                status = PaymentStatus.PAID;
+            }
+
+            PaymentType paymentType = resolvePaymentType(depositApplied, rentPortion);
+
+            UnitRentPayment payment = new UnitRentPayment();
+            payment.setRentalUnitId(unit.getId());
+            payment.setTenantId(tenantId);
+            payment.setPropertyId(unit.getPropertyId());
+            payment.setAmount(amount);
+            payment.setPaymentMethod(PaymentMethod.WALLET);
+            payment.setPaymentReference(reference);
+            payment.setPaymentType(paymentType);
+            payment.setDepositAmountApplied(depositApplied);
+            payment.setRentAmountApplied(rentPortion.compareTo(BigDecimal.ZERO) > 0 ? rentPortion : BigDecimal.ZERO);
+            payment.setStatus(status);
+            payment.setResultingBalance(balanceAfter);
+            payment.setPaidAt(LocalDateTime.now());
+            payment.setDescription(buildDescription(paymentType, depositApplied, status, balanceAfter));
+
+            return new UnitBooking(unitRentPaymentRepository.save(payment), status, balanceAfter);
+        } catch (RuntimeException e) {
+            undoPartialBooking(unit.getId(), reference, depositCreatedHere, balanceBefore);
+            throw e;
         }
+    }
 
-        PaymentStatus status;
-        BigDecimal balanceAfter;
-
-        if (rentPortion.compareTo(BigDecimal.ZERO) > 0) {
-            RentBalance balance = rentBalanceService.findOrCreateUnitBalance(
-                    unit.getId(), tenantId, unit.getPropertyId());
-
-            rentBalanceService.chargeElapsedMonthsIfNeeded(balance, unit.getRentAmount());
-            rentBalanceService.applyPayment(balance, rentPortion);
-
-            balanceAfter = balance.getBalance();
-            status = resolveStatus(balanceAfter);
-        } else {
-            // The entire payment went to the deposit — no rent portion to apply.
-            balanceAfter = rentBalanceService.getUnitBalance(unit.getId(), tenantId).getBalance();
-            status = PaymentStatus.PAID;
+    private void undoPartialBooking(String rentalUnitId, String reference, String depositCreatedHere,
+                                     RentBalance balanceBefore) {
+        try {
+            if (balanceBefore != null) {
+                rentBalanceService.restore(balanceBefore);
+            }
+            if (depositCreatedHere != null) {
+                securityDepositService.undoHold(depositCreatedHere);
+            }
+        } catch (RuntimeException rollbackFailure) {
+            log.error("COULD NOT ROLL BACK a half-booked payment on unit {} (reference {}). Check the "
+                            + "rent balance and security deposit for this unit before retrying: {}",
+                    rentalUnitId, reference, rollbackFailure.getMessage(), rollbackFailure);
         }
-
-        PaymentType paymentType = resolvePaymentType(depositApplied, rentPortion);
-
-        UnitRentPayment payment = new UnitRentPayment();
-        payment.setRentalUnitId(unit.getId());
-        payment.setTenantId(tenantId);
-        payment.setPropertyId(unit.getPropertyId());
-        payment.setAmount(amount);
-        payment.setPaymentMethod(PaymentMethod.WALLET);
-        payment.setPaymentReference(reference);
-        payment.setPaymentType(paymentType);
-        payment.setDepositAmountApplied(depositApplied);
-        payment.setRentAmountApplied(rentPortion.compareTo(BigDecimal.ZERO) > 0 ? rentPortion : BigDecimal.ZERO);
-        payment.setStatus(status);
-        payment.setResultingBalance(balanceAfter);
-        payment.setPaidAt(LocalDateTime.now());
-        payment.setDescription(buildDescription(paymentType, depositApplied, status, balanceAfter));
-
-        return new UnitBooking(unitRentPaymentRepository.save(payment), status, balanceAfter);
     }
 
     private PaymentStatus resolveStatus(BigDecimal balanceAfter) {

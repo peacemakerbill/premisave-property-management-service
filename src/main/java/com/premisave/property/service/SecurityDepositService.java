@@ -286,6 +286,18 @@ public class SecurityDepositService {
         return findActiveUnitDeposit(rentalUnitId, tenantId).isPresent();
     }
 
+    // Takes back a hold that a rent payment created but could not finish booking, so the retry
+    // starts from the same state as the first attempt. Only an untouched HELD deposit is removed.
+    public void undoHold(String depositId) {
+        depositRepository.findById(depositId).ifPresent(deposit -> {
+            boolean untouched = deposit.getStatus() == DepositStatus.HELD
+                    && (deposit.getRefundedAmount() == null || deposit.getRefundedAmount().signum() == 0);
+            if (untouched) {
+                depositRepository.delete(deposit);
+            }
+        });
+    }
+
     // ------------------------------------------------------------------
     // Notifications — best-effort. The emails themselves are built and sent by
     // PaymentNotificationService (asynchronously); this only gathers the values.

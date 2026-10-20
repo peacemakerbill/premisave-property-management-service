@@ -121,10 +121,10 @@ public class InspectionService {
 
     public List<InspectionResponse> getInspectionsByInspector(String inspectorUserId, String callerUserId) {
         boolean isSelf = inspectorUserId.equals(callerUserId);
-        boolean isHomeOwner = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_HOME_OWNER"));
+        boolean isAdmin = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
-        if (!isSelf && !isHomeOwner) {
+        if (!isSelf && !isAdmin) {
             throw new UnauthorizedException("You can only view your own assigned inspections");
         }
 

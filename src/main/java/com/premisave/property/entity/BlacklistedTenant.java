@@ -20,6 +20,7 @@ public class BlacklistedTenant {
     private String rentalUnitId;   // unit the tenant was in at time of blacklisting, if known
     private String propertyId;     // property the tenant was in at time of blacklisting, if known
 
+    private String createdByOwnerId;   // owner who blacklisted the tenant; null for admin entries and older records
     private LocalDateTime blacklistedAt;
     private LocalDateTime expiresAt;
 

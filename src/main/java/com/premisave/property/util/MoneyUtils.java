@@ -14,6 +14,11 @@ public final class MoneyUtils {
     private MoneyUtils() {
     }
 
+    /** Amounts are stored and paid at 2 decimal places, rounded half up. */
+    public static BigDecimal round(BigDecimal value) {
+        return value.setScale(2, RoundingMode.HALF_UP);
+    }
+
     /** "1,500.00" — no currency code. */
     public static String amount(BigDecimal value) {
         BigDecimal v = value != null ? value : BigDecimal.ZERO;

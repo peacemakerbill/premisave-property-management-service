@@ -98,7 +98,15 @@ public class WalletPaymentService {
      */
     public record CollectionCommand(String reference, String tenantId, String propertyId,
                                     WalletTransferPurpose purpose, String targetId,
-                                    BigDecimal amount, String description) {
+                                    BigDecimal amount, String description,
+                                    BigDecimal depositPortion, BigDecimal rentPortion) {
+
+        /** For payments that are not split (utility bills). */
+        public CollectionCommand(String reference, String tenantId, String propertyId,
+                                 WalletTransferPurpose purpose, String targetId,
+                                 BigDecimal amount, String description) {
+            this(reference, tenantId, propertyId, purpose, targetId, amount, description, null, null);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -245,6 +253,8 @@ public class WalletPaymentService {
         transfer.setRecipientAccount(resolveOwnerAccount(owner));
         transfer.setAmount(cmd.amount());
         transfer.setDescription(cmd.description());
+        transfer.setDepositPortion(cmd.depositPortion());
+        transfer.setRentPortion(cmd.rentPortion());
         transfer.setStatus(WalletTransferStatus.INITIATED);
         transfer.setInFlightUntil(LocalDateTime.now().plusSeconds(IN_FLIGHT_SECONDS));
 

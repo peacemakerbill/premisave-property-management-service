@@ -11,6 +11,7 @@ import java.util.List;
 public interface RentalUnitRepository extends MongoRepository<RentalUnit, String> {
 
     List<RentalUnit> findByPropertyId(String propertyId);
+    List<RentalUnit> findByPropertyIdIn(List<String> propertyIds);
     
     List<RentalUnit> findByStatus(UnitStatus status);
     

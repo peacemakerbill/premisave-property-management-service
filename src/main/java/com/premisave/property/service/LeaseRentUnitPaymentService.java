@@ -200,13 +200,19 @@ public class LeaseRentUnitPaymentService {
         // ---- Move the money: tenant wallet -> property owner's wallet --------------------------
         WalletTransfer transfer = walletPaymentService.collect(new WalletPaymentService.CollectionCommand(
                 reference, tenantId, lease.getPropertyId(), WalletTransferPurpose.LEASE_RENT, lease.getId(),
-                request.getAmount(), "Rent payment for " + locationSummary(unit, property)));
+                request.getAmount(), "Rent payment for " + locationSummary(unit, property),
+                depositToApply, rentPortion));
 
         // ---- Book it ---------------------------------------------------------------------------
+        // On a retry the split saved with the transfer wins: the first attempt may already have
+        // held the deposit, which would make a fresh calculation send the whole amount to rent.
+        BigDecimal bookDeposit = transfer.getDepositPortion() != null ? transfer.getDepositPortion() : depositToApply;
+        BigDecimal bookRent = transfer.getRentPortion() != null ? transfer.getRentPortion() : rentPortion;
+
         LeaseBooking booking;
         try {
             booking = bookLeasePayment(lease.getId(), tenantId, request.getAmount(), transfer.getReference(),
-                    depositToApply, rentPortion);
+                    bookDeposit, bookRent);
         } catch (RuntimeException e) {
             throw walletPaymentService.bookingFailed(transfer, e);
         }
@@ -242,37 +248,76 @@ public class LeaseRentUnitPaymentService {
     /**
      * Local booking once the money has moved: hold the deposit portion, apply the
      * rent portion across schedule entries, and save the payment record.
+     *
+     * MongoDB has no transaction here, so this is all-or-nothing by hand: if any step fails,
+     * what this attempt already changed is put back before the error goes out, and a retry
+     * with the same reference starts from the same state. A deposit that is already held
+     * (by an earlier attempt that could not be rolled back) is kept, never held twice.
      */
     private LeaseBooking bookLeasePayment(String leaseId, String tenantId, BigDecimal amount, String reference,
                                            BigDecimal depositToApply, BigDecimal rentPortion) {
         BigDecimal depositApplied = BigDecimal.ZERO;
+        String depositCreatedHere = null;
+        List<ScheduleSnapshot> undo = new ArrayList<>();
 
-        if (depositToApply.compareTo(BigDecimal.ZERO) > 0) {
-            SecurityDepositRequest depositRequest = new SecurityDepositRequest();
-            depositRequest.setLeaseId(leaseId);
-            depositRequest.setAmount(depositToApply);
-            securityDepositService.holdDeposit(depositRequest);
-            depositApplied = depositToApply;
+        try {
+            if (depositToApply.compareTo(BigDecimal.ZERO) > 0) {
+                if (securityDepositRepository.findByLeaseId(leaseId).isEmpty()) {
+                    SecurityDepositRequest depositRequest = new SecurityDepositRequest();
+                    depositRequest.setLeaseId(leaseId);
+                    depositRequest.setAmount(depositToApply);
+                    depositCreatedHere = securityDepositService.holdDeposit(depositRequest).getId();
+                }
+                depositApplied = depositToApply;
+            }
+
+            RentApplicationResult rentResult = applyRentAcrossSchedules(leaseId, rentPortion, undo);
+
+            LeaseRentUnitPayment payment = new LeaseRentUnitPayment();
+            payment.setLeaseId(leaseId);
+            payment.setTenantId(tenantId);
+            payment.setAmount(amount);
+            payment.setAmountPaid(amount);
+            payment.setDepositAmountApplied(depositApplied);
+            payment.setRentAmountApplied(rentResult.totalRentApplied());
+            PaymentType paymentType = resolvePaymentType(depositApplied, rentResult.totalRentApplied());
+            payment.setPaymentType(paymentType);
+            payment.setPaymentMethod(PaymentMethod.WALLET);
+            payment.setPaymentReference(reference);
+            payment.setStatus(deriveTransactionStatus(rentResult));
+            payment.setPaidAt(LocalDateTime.now());
+            payment.setDescription(buildPaymentDescription(paymentType, depositApplied, rentResult));
+
+            return new LeaseBooking(leaseRentUnitPaymentRepository.save(payment), rentResult);
+        } catch (RuntimeException e) {
+            undoPartialBooking(leaseId, reference, depositCreatedHere, undo);
+            throw e;
         }
+    }
 
-        RentApplicationResult rentResult = applyRentAcrossSchedules(leaseId, rentPortion);
+    private void undoPartialBooking(String leaseId, String reference, String depositCreatedHere,
+                                     List<ScheduleSnapshot> undo) {
+        try {
+            for (int i = undo.size() - 1; i >= 0; i--) {
+                ScheduleSnapshot snapshot = undo.get(i);
+                rentScheduleRepository.findById(snapshot.id()).ifPresent(schedule -> {
+                    schedule.setAmountPaid(snapshot.amountPaid());
+                    schedule.setStatus(snapshot.status());
+                    rentScheduleRepository.save(schedule);
+                });
+            }
+            if (depositCreatedHere != null) {
+                securityDepositService.undoHold(depositCreatedHere);
+            }
+        } catch (RuntimeException rollbackFailure) {
+            log.error("COULD NOT ROLL BACK a half-booked payment on lease {} (reference {}). Check the "
+                            + "rent schedule and security deposit for this lease before retrying: {}",
+                    leaseId, reference, rollbackFailure.getMessage(), rollbackFailure);
+        }
+    }
 
-        LeaseRentUnitPayment payment = new LeaseRentUnitPayment();
-        payment.setLeaseId(leaseId);
-        payment.setTenantId(tenantId);
-        payment.setAmount(amount);
-        payment.setAmountPaid(amount);
-        payment.setDepositAmountApplied(depositApplied);
-        payment.setRentAmountApplied(rentResult.totalRentApplied());
-        PaymentType paymentType = resolvePaymentType(depositApplied, rentResult.totalRentApplied());
-        payment.setPaymentType(paymentType);
-        payment.setPaymentMethod(PaymentMethod.WALLET);
-        payment.setPaymentReference(reference);
-        payment.setStatus(deriveTransactionStatus(rentResult));
-        payment.setPaidAt(LocalDateTime.now());
-        payment.setDescription(buildPaymentDescription(paymentType, depositApplied, rentResult));
-
-        return new LeaseBooking(leaseRentUnitPaymentRepository.save(payment), rentResult);
+    /** The state of a schedule entry before this payment touched it. */
+    private record ScheduleSnapshot(String id, BigDecimal amountPaid, PaymentStatus status) {
     }
 
     // ------------------------------------------------------------------
@@ -289,7 +334,8 @@ public class LeaseRentUnitPaymentService {
      * OVERPAID credit on the last schedule entry touched, rather than
      * silently discarded.
      */
-    private RentApplicationResult applyRentAcrossSchedules(String leaseId, BigDecimal amountToApply) {
+    private RentApplicationResult applyRentAcrossSchedules(String leaseId, BigDecimal amountToApply,
+                                                           List<ScheduleSnapshot> undo) {
         List<ScheduleApplication> applications = new ArrayList<>();
 
         if (amountToApply.compareTo(BigDecimal.ZERO) <= 0) {
@@ -321,6 +367,8 @@ public class LeaseRentUnitPaymentService {
 
             RentSchedule schedule = nextScheduleOpt.get();
             BigDecimal due = schedule.getAmountDue().subtract(schedule.getAmountPaid());
+
+            undo.add(new ScheduleSnapshot(schedule.getId(), schedule.getAmountPaid(), schedule.getStatus()));
 
             if (remaining.compareTo(due) >= 0) {
                 // Fully settles this period, possibly with room left for the next one.
@@ -355,6 +403,8 @@ public class LeaseRentUnitPaymentService {
 
             // No further schedule entries exist — hold the excess as a
             // visible credit on the last entry touched.
+            undo.add(new ScheduleSnapshot(lastTouchedSchedule.getId(),
+                    lastTouchedSchedule.getAmountPaid(), lastTouchedSchedule.getStatus()));
             BigDecimal newAmountPaid = lastTouchedSchedule.getAmountPaid().add(remaining);
             lastTouchedSchedule.setAmountPaid(newAmountPaid);
             lastTouchedSchedule.setStatus(PaymentStatus.OVERPAID);

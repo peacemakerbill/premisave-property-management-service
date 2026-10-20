@@ -3,6 +3,7 @@ package com.premisave.property.controller;
 import com.premisave.property.dto.request.CreatePropertyRequest;
 import com.premisave.property.dto.request.UpdatePropertyRequest;
 import com.premisave.property.dto.response.PropertyResponse;
+import com.premisave.property.security.AccessGuard;
 import com.premisave.property.service.OwnerService;
 import com.premisave.property.service.PropertyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,6 +24,7 @@ public class PropertyController {
 
     private final PropertyService propertyService;
     private final OwnerService ownerService;
+    private final AccessGuard guard;
 
     @PostMapping
     @PreAuthorize("hasRole('HOME_OWNER')")
@@ -44,6 +46,7 @@ public class PropertyController {
 
     @GetMapping("/{id}")
     public ResponseEntity<PropertyResponse> getProperty(@PathVariable String id) {
+        guard.requirePropertyParticipant(id);
         return ResponseEntity.ok(propertyService.getPropertyById(id));
     }
 

@@ -11,6 +11,7 @@ import com.premisave.property.entity.OccupancyHistory;
 import com.premisave.property.entity.Property;
 import com.premisave.property.entity.RentalUnit;
 import com.premisave.property.exception.ConflictException;
+import com.premisave.property.exception.ForbiddenException;
 import com.premisave.property.exception.ResourceNotFoundException;
 import com.premisave.property.repository.BlacklistedTenantRepository;
 import com.premisave.property.repository.OccupancyHistoryRepository;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -36,7 +38,7 @@ public class BlacklistedTenantService {
     private final PropertyRepository propertyRepository;
 
     @Transactional
-    public BlacklistedTenantResponse blacklistTenant(BlacklistTenantRequest request) {
+    public BlacklistedTenantResponse blacklistTenant(BlacklistTenantRequest request, String ownerId) {
         blacklistedTenantRepository.findByTenantId(request.getTenantId()).ifPresent(existing -> {
             throw new ConflictException("Tenant is already blacklisted");
         });
@@ -45,6 +47,7 @@ public class BlacklistedTenantService {
         blacklisted.setTenantId(request.getTenantId());
         blacklisted.setReason(request.getReason());
         blacklisted.setNotes(request.getNotes());
+        blacklisted.setCreatedByOwnerId(ownerId);
         blacklisted.setBlacklistedAt(LocalDateTime.now());
 
         // Capture the most recent occupancy record for this tenant, current
@@ -63,9 +66,13 @@ public class BlacklistedTenantService {
     }
 
     @Transactional
-    public void removeFromBlacklist(String tenantId) {
+    public void removeFromBlacklist(String tenantId, String callerOwnerId, boolean admin) {
         BlacklistedTenant blacklisted = blacklistedTenantRepository.findByTenantId(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant is not currently blacklisted"));
+        // Only the owner who listed the tenant (or an admin) can lift it.
+        if (!admin && !Objects.equals(blacklisted.getCreatedByOwnerId(), callerOwnerId)) {
+            throw new ForbiddenException("Only the owner who blacklisted this tenant can remove them from the list");
+        }
 
         blacklistedTenantRepository.delete(blacklisted);
         tenantService.setBlacklisted(tenantId, false);
@@ -77,8 +84,10 @@ public class BlacklistedTenantService {
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant is not currently blacklisted"));
     }
 
-    public List<BlacklistedTenantResponse> getAllBlacklisted() {
+    // Admins see every entry; an owner sees the ones they created.
+    public List<BlacklistedTenantResponse> getAllBlacklisted(String callerOwnerId, boolean admin) {
         return blacklistedTenantRepository.findAll().stream()
+                .filter(b -> admin || Objects.equals(b.getCreatedByOwnerId(), callerOwnerId))
                 .map(this::toResponse)
                 .toList();
     }

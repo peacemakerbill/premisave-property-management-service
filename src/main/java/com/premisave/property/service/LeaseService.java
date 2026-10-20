@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -116,6 +117,14 @@ public class LeaseService {
 
     public List<LeaseResponse> getLeasesByTenant(String tenantId) {
         return leaseRepository.findByTenantId(tenantId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // A landlord's view of a tenant: only the leases on the landlord's own properties.
+    public List<LeaseResponse> getLeasesByTenantInProperties(String tenantId, Set<String> propertyIds) {
+        return leaseRepository.findByTenantId(tenantId).stream()
+                .filter(lease -> propertyIds.contains(lease.getPropertyId()))
                 .map(this::toResponse)
                 .toList();
     }

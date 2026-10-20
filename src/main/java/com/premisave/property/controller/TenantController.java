@@ -4,6 +4,7 @@ import com.premisave.property.dto.request.TenantRegistrationRequest;
 import com.premisave.property.dto.request.UpdateTenantRequest;
 import com.premisave.property.dto.response.ProfileSyncStatusResponse;
 import com.premisave.property.dto.response.TenantResponse;
+import com.premisave.property.security.AccessGuard;
 import com.premisave.property.service.TenantService;
 import com.premisave.property.health.ExternalService;
 import com.premisave.property.health.RequiresServices;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class TenantController {
 
     private final TenantService tenantService;
+    private final AccessGuard guard;
 
     @PostMapping("/register")
     public ResponseEntity<TenantResponse> registerTenant(@Valid @RequestBody TenantRegistrationRequest request,
@@ -77,6 +79,8 @@ public class TenantController {
 
     @GetMapping("/{id}")
     public ResponseEntity<TenantResponse> getTenant(@PathVariable String id) {
+        // The profile includes the tenant's ID number: the tenant, an admin, or a landlord they rent from.
+        guard.requireTenantSelfOrLandlord(id);
         return ResponseEntity.ok(tenantService.getTenantById(id));
     }
 

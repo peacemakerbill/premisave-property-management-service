@@ -4,6 +4,7 @@ import com.premisave.property.dto.request.CreateOwnerRequest;
 import com.premisave.property.dto.request.UpdateOwnerRequest;
 import com.premisave.property.dto.response.OwnerResponse;
 import com.premisave.property.dto.response.ProfileSyncStatusResponse;
+import com.premisave.property.security.AccessGuard;
 import com.premisave.property.service.OwnerService;
 import com.premisave.property.health.ExternalService;
 import com.premisave.property.health.RequiresServices;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class OwnerController {
 
     private final OwnerService ownerService;
+    private final AccessGuard guard;
 
     @PostMapping
     public ResponseEntity<OwnerResponse> createOwner(@Valid @RequestBody CreateOwnerRequest request,
@@ -79,6 +81,8 @@ public class OwnerController {
 
     @GetMapping("/{id}")
     public ResponseEntity<OwnerResponse> getOwner(@PathVariable String id) {
+        // The profile carries bank details, so it is the owner's (or an admin's) to read.
+        guard.requireOwnerSelf(id);
         return ResponseEntity.ok(ownerService.getOwnerById(id));
     }
 

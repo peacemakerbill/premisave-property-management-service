@@ -2,6 +2,7 @@ package com.premisave.property.controller;
 
 import com.premisave.property.dto.response.RentBalanceResponse;
 import com.premisave.property.dto.response.TenantRentBalanceSummaryResponse;
+import com.premisave.property.security.AccessGuard;
 import com.premisave.property.service.RentBalanceService;
 import com.premisave.property.service.TenantService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,7 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-// Arrears / credit reporting — the "fee balance statement" view, covering
+// Arrears / credit reporting: the "fee balance statement" view, covering
 // both lease-based and direct-unit tenancies.
 @RestController
 @RequestMapping("/api/v1/rent/balance")
@@ -18,9 +19,11 @@ public class RentBalanceController {
 
     private final RentBalanceService rentBalanceService;
     private final TenantService tenantService;
+    private final AccessGuard guard;
 
     @GetMapping("/lease/{leaseId}")
     public ResponseEntity<RentBalanceResponse> getLeaseBalance(@PathVariable String leaseId) {
+        guard.requireLeaseParticipant(leaseId);
         return ResponseEntity.ok(rentBalanceService.getLeaseBalance(leaseId));
     }
 
@@ -31,14 +34,21 @@ public class RentBalanceController {
         return ResponseEntity.ok(rentBalanceService.getUnitBalance(rentalUnitId, tenantId));
     }
 
+    // The tenant themselves, or whoever manages the unit.
     @GetMapping("/unit/{rentalUnitId}/tenant/{tenantId}")
     public ResponseEntity<RentBalanceResponse> getUnitBalanceForTenant(@PathVariable String rentalUnitId,
                                                                          @PathVariable String tenantId) {
+        if (!guard.isSelf(tenantId)) {
+            guard.requireUnitManager(rentalUnitId);
+        }
         return ResponseEntity.ok(rentBalanceService.getUnitBalance(rentalUnitId, tenantId));
     }
 
+    // The summary adds up a tenant's balances across every landlord, so only the tenant
+    // (or an admin) gets it. A landlord reads the per-lease and per-unit balances instead.
     @GetMapping("/tenant/{tenantId}")
     public ResponseEntity<TenantRentBalanceSummaryResponse> getTenantSummary(@PathVariable String tenantId) {
+        guard.requireTenantSelf(tenantId);
         return ResponseEntity.ok(rentBalanceService.getTenantSummary(tenantId));
     }
 

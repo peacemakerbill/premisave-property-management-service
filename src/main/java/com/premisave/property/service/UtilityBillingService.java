@@ -64,7 +64,7 @@ public class UtilityBillingService {
         bill.setTenantId(tenantId);
         bill.setRentalUnitId(request.getRentalUnitId());
         bill.setUtilityType(request.getUtilityType());
-        bill.setAmount(request.getAmount());
+        bill.setAmount(MoneyUtils.round(request.getAmount()));
         bill.setAmountPaid(BigDecimal.ZERO);
         bill.setStatus(PaymentStatus.PENDING);
         bill.setBillingPeriodStart(request.getBillingPeriodStart());
@@ -92,7 +92,13 @@ public class UtilityBillingService {
         String tenantId = resolveCurrentTenant(reading.getRentalUnitId());
         UtilityType utilityType = resolveUtilityType(reading.getMeterType());
         BigDecimal ratePerUnit = resolveRatePerUnit(utilityType, request.getRatePerUnit());
-        BigDecimal amount = reading.getConsumption().multiply(ratePerUnit);
+        // Payments are accepted at 2 decimal places, so a bill has to be a whole number of cents.
+        BigDecimal amount = MoneyUtils.round(reading.getConsumption().multiply(ratePerUnit));
+        if (amount.signum() <= 0) {
+            throw new BadRequestException("This reading has no billable consumption (" + reading.getConsumption()
+                    + " units at " + ratePerUnit.toPlainString() + " per unit rounds to "
+                    + MoneyUtils.format(amount) + ")");
+        }
 
         UtilityBill bill = new UtilityBill();
         bill.setTenantId(tenantId);

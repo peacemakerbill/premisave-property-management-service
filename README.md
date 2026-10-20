@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=1A3C34&height=240&section=header&text=Premisave%20Property%20Service&fontSize=52&fontColor=ffffff&fontAlignY=34&desc=Core%20property%2C%20lease%2C%20tenant%2C%20and%20rent%20management%20microservice&descSize=18&descAlignY=58&animation=fadeIn" alt="Premisave Property Management Service - property, lease, tenant and rent management microservice banner" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=1A3C34&height=240&section=header&text=Premisave%20Property%20Service&fontSize=52&fontColor=ffffff&fontAlignY=34&desc=Core%20property%2C%20lease%2C%20tenant%20%26%20rent%20management%20microservice&descSize=18&descAlignY=58&animation=fadeIn" alt="Premisave Property Management Service - property, lease, tenant and rent management microservice banner" />
 </p>
 
 <h1 align="center">Premisave Property Management Service: Property, Lease &amp; Rent Management API</h1>
@@ -52,7 +52,8 @@
   <a href="#service-availability-and-resilience">Service availability</a> ·
   <a href="#api-reference">API reference</a> ·
   <a href="#configuration-reference">Configuration</a> ·
-  <a href="#troubleshooting">Troubleshooting</a>
+  <a href="#troubleshooting">Troubleshooting</a> ·
+  <a href="#known-limits">Known limits</a>
 </p>
 
 > **If this saves you time building a property/lease domain service in Java, please star the repo.** It helps other Kenyan fintech and proptech developers find it.
@@ -79,9 +80,11 @@
 14. [Security notes](#security-notes)
 15. [Project structure](#project-structure)
 16. [Troubleshooting](#troubleshooting)
-17. [Roadmap ideas](#roadmap-ideas)
-18. [Contributing](#contributing)
-19. [Author](#author)
+17. [Upgrading from earlier deliveries](#upgrading-from-earlier-deliveries)
+18. [Known limits](#known-limits)
+19. [Roadmap ideas](#roadmap-ideas)
+20. [Contributing](#contributing)
+21. [Author](#author)
 
 ---
 
@@ -104,12 +107,12 @@ It was built for the Premisave platform's own microservice ecosystem (alongside 
 | | |
 |---|---|
 | **Two tenancy models, one payment API** | Lease-backed tenancies (unit or whole-property, with a generated `RentSchedule`) and directly-occupied units (with a running `RentBalance` ledger) share the same payment, deposit, and notice endpoints. |
-| **Wallet-funded payments** | Rent and utility bill payments call the wallet service's `/internal/transfer` once, moving money tenant → owner. This service books the payment locally only after that transfer succeeds. |
+| **Wallet-funded payments** | Rent and utility bill payments call the wallet service's `/internal/transfer` once, moving money from the tenant to the owner. This service books the payment locally only after that transfer succeeds. |
 | **Idempotent by design** | Every payment accepts an optional client reference. A `wallet_transfers` collection (unique-indexed on reference) makes a retried request safe — it is never charged twice, whether the previous attempt succeeded, failed, or timed out. |
 | **Service availability checks** | Endpoints that need auth-service or the wallet service check reachability first, and return a friendly, structured 503 — not a hang or a 500 — when a dependency is down. A `GET /system/dependencies` endpoint reports live status for a frontend to poll. |
 | **Security deposits with partial refunds** | Deposits are held once per tenancy, with a running refund history; a partial refund requires a reason, a final refund closes the deposit out. |
 | **Utility billing from meter readings** | A meter reading can auto-generate a bill using a configured per-unit rate, with duplicate-reading and duplicate-bill guards. |
-| **Maintenance → work order pipeline** | A tenant's maintenance request can be turned into an assigned work order, with status kept in sync in both directions. |
+| **Maintenance to work order pipeline** | A tenant's maintenance request can be turned into an assigned work order, with status kept in sync in both directions. |
 | **Bulk & scheduled notices** | Rent reminders and other notices can be sent to many units/leases at once, immediately or at a future time, with per-recipient delivery results and a 24-hour duplicate-notice guard. |
 | **Designed HTML email notifications** | Payment receipts, deposit and refund notices, utility bills, failed-payment alerts, and owner-written notices are all sent as branded HTML (Thymeleaf) with a plain-text fallback — no plain default Spring emails. |
 | **Owner & tenant "quick" onboarding** | One-click profile creation that pulls name/phone/email straight from the caller's own auth-service account, plus a sync-status check so the frontend can prompt "your profile changed — sync now?". |
@@ -154,7 +157,7 @@ sequenceDiagram
     T->>PS: POST /rent/pay { leaseId, amount, reference }
     PS->>PS: Check auth-service & wallet-service are reachable
     PS->>PS: Validate lease, deposit requirement, outstanding schedule
-    PS->>WS: POST /internal/transfer (tenant wallet → owner wallet)
+    PS->>WS: POST /internal/transfer (tenant wallet to owner wallet)
     WS-->>PS: Transfer confirmed
     PS->>DB: Apply payment to deposit / rent schedule, mark wallet_transfers BOOKED
     PS-->>T: 200 — payment receipt
@@ -180,6 +183,7 @@ Every endpoint that depends on auth-service or the wallet service is annotated t
 
 - **USD is the only currency this service ever records**, matching the wallet service's own USD-denominated wallets — a rent amount, a utility rate, and a deposit are all plain USD figures.
 - **This service moves no money itself.** A payment request results in exactly one wallet-service transfer call; this service only ever books the *result* of that transfer against a lease, a unit's balance, a deposit, or a bill.
+- **Amounts have at most 2 decimal places** and must be positive. Bills generated from a meter reading are rounded half up to the cent.
 - **Idempotency**: every payment accepts an optional caller-supplied `reference`. Retrying with the same one is guaranteed safe — it returns the original result rather than moving money again — tracked via a unique-indexed `wallet_transfers` collection.
 
 ## Quick start
@@ -232,9 +236,12 @@ NOTICE_EMAIL_FROM=no-reply@premisave.com
 # Utility billing rates (USD per unit of metered consumption)
 UTILITY_RATE_ELECTRICITY=0.15
 UTILITY_RATE_WATER=1.50
+
+# Browser origins allowed to call this API (comma separated)
+CORS_ALLOWED_ORIGINS=http://localhost:3000
 ```
 
-> **Important:** write `.env` values without quotes and without trailing spaces. `INTERNAL_API_KEY` must be byte-for-byte identical to the value configured in auth-service and wallet-service — a mismatch shows up as 401s on every internal call, not a startup error.
+> **Important:** write `.env` values without quotes and without trailing spaces. `INTERNAL_API_KEY` must be byte-for-byte identical to the value configured in auth-service and wallet-service — a mismatch shows up as 401s on every internal call, not a startup error. A *blank* `JWT_SECRET` or `INTERNAL_API_KEY` does stop the service at startup, with a message naming the missing variable.
 
 When the service is healthy you will see lines like:
 
@@ -269,8 +276,8 @@ Every setting lives in `src/main/resources/application.yml` and can be overridde
 | `MONGODB_URI` | `mongodb://localhost:27017/premisave-property` | no | MongoDB connection string. |
 | `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | no | Redis connection, backing `@EnableCaching`. |
 | `RABBITMQ_HOST` / `RABBITMQ_PORT` | `localhost` / `5672` | no | RabbitMQ connection. |
-| `JWT_SECRET` | dev default | **yes in production** | Must match every other Premisave service validating the same tokens. |
-| `INTERNAL_API_KEY` | none | **yes** | Shared secret this service presents as `X-API-Key` to auth-service and wallet-service, and expects from sibling services calling in. |
+| `JWT_SECRET` | none | **yes** | Must match every other Premisave service validating the same tokens. The service will not start without it. |
+| `INTERNAL_API_KEY` | none | **yes** | The service will not start without it. Shared secret this service presents as `X-API-Key` to auth-service and wallet-service, and expects from sibling services calling in. |
 | `AUTH_SERVICE_URL` | `http://localhost:8080` | no | Base URL of auth-service. |
 | `WALLET_SERVICE_URL` | `http://localhost:8084` | no | Base URL of the wallet service; every rent/utility payment goes through its `/internal/transfer`. |
 | `LISTING_SERVICE_URL` / `BOOKING_SERVICE_URL` | `http://localhost:8082` / `8083` | no | Base URLs of the listing and booking services. |
@@ -279,10 +286,36 @@ Every setting lives in `src/main/resources/application.yml` and can be overridde
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | `smtp.gmail.com` / `587` / — / — | **yes, for email** | SMTP credentials for outgoing notifications. |
 | `NOTICE_EMAIL_FROM` / `NOTICE_EMAIL_FROM_NAME` | `no-reply@premisave.com` / `Premisave` | no | From address and display name on every outgoing email. |
 | `SUPPORT_EMAIL` | `support@premisave.com` | no | Shown as the contact address in every email footer. |
-| `UTILITY_RATE_ELECTRICITY` / `UTILITY_RATE_WATER` | — | no | USD charged per unit of metered consumption when auto-generating a bill from a meter reading. |
+| `UTILITY_RATE_ELECTRICITY` / `UTILITY_RATE_WATER` | `0.15` / `1.50` | no | USD charged per unit of metered consumption when auto-generating a bill from a meter reading. Starting points; set your real rates. |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:4200,http://localhost:5173` | **yes, when deploying** | Comma-separated browser origins allowed to call the API. A single `*` allows every origin and turns credentials off; use it only for local experiments. |
+| `LOG_LEVEL` | `INFO` | no | Log level for `com.premisave.property`. Use `DEBUG` while developing. |
+| `SYSTEM_TEST_TOKEN_ENABLED` | `false` | no | Turns on `GET /system/test-token`, which decodes a JWT and shows its claims. Leave off outside development. |
 | `FRONTEND_URL` | `http://localhost:3000` | no | Used as the link behind every email's call-to-action button. |
 
-The service **starts with a warning** if `INTERNAL_API_KEY` or `JWT_SECRET` are left blank — treat both as required outside local development.
+The service **refuses to start** if `INTERNAL_API_KEY` or `JWT_SECRET` is blank. A blank `JWT_SECRET` would otherwise sign and accept tokens with an all-zero key that anyone can forge.
+
+### Environment variables by group
+
+`additional-spring-configuration-metadata.json` documents the keys for the IDE.
+
+| Group | Variables |
+|:-|:-|
+| Database and cache | `MONGODB_URI`, `REDIS_HOST`, `REDIS_PORT` |
+| Messaging | `RABBITMQ_HOST`, `RABBITMQ_PORT` |
+| Auth | `JWT_SECRET` |
+| Internal calls | `INTERNAL_API_KEY` |
+| Sibling services | `AUTH_SERVICE_URL`, `WALLET_SERVICE_URL`, `LISTING_SERVICE_URL`, `BOOKING_SERVICE_URL` |
+| Availability checks | `SERVICE_HEALTH_CHECKS_ENABLED`, `AUTH_SERVICE_HEALTH_PATH`, `WALLET_SERVICE_HEALTH_PATH` |
+| Mail | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` (Gmail needs an app password), `NOTICE_EMAIL_FROM`, `NOTICE_EMAIL_FROM_NAME`, `SUPPORT_EMAIL` |
+| Frontend and browsers | `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS` |
+| Billing | `UTILITY_RATE_ELECTRICITY`, `UTILITY_RATE_WATER` |
+| Operations | `LOG_LEVEL`, `SYSTEM_TEST_TOKEN_ENABLED` |
+
+### What the service checks at startup
+
+- **Secrets.** A blank `JWT_SECRET` or `INTERNAL_API_KEY` stops the service with a message naming the variable.
+- **The payment ledger index.** The unique index on `wallet_transfers.reference` is what makes a duplicate wallet payment impossible under concurrent requests, so if it cannot be created the service does not start.
+- **Every other index** (one row per owner, tenant, deposit and bill, plus the lookup indexes the endpoints use) is created on a best effort basis. One that cannot be built, for example because existing rows already break a unique rule, is logged as a warning and skipped, so one bad row cannot take the service down. Unique indexes are sparse, so older rows missing the field do not clash.
 
 ## API reference
 
@@ -424,6 +457,7 @@ Selected MongoDB collections and the fields most integration partners need:
 1. **Confirm `INTERNAL_API_KEY` and `JWT_SECRET`** are strong, and identical to the values configured in auth-service and wallet-service.
 2. **Point `AUTH_SERVICE_URL` and `WALLET_SERVICE_URL`** at their real, network-reachable addresses, and confirm each one's health path (`AUTH_SERVICE_HEALTH_PATH`, `WALLET_SERVICE_HEALTH_PATH`) is reachable from this service.
 3. **Set real `UTILITY_RATE_*` values** — the defaults are placeholders and will misprice any bill generated from a meter reading until set.
+   **Set `CORS_ALLOWED_ORIGINS`** to the real frontend address(es), and leave `SYSTEM_TEST_TOKEN_ENABLED` off.
 4. **Confirm outgoing email** works end-to-end (a payment, a deposit, and a notice) against your real SMTP credentials before relying on it for tenant communication.
 5. **Decide on `SERVICE_HEALTH_CHECKS_ENABLED`** deliberately — leaving it `true` (the default) is almost always right in a real deployment, since it is what turns a dead dependency into a clear 503 instead of a hang.
 
@@ -432,9 +466,26 @@ Selected MongoDB collections and the fields most integration partners need:
 - **JWT authentication** for all end-user-facing endpoints, validated against the platform's shared secret.
 - **Internal API key authentication** (`X-API-Key`) for service-to-service calls, kept entirely separate from user JWTs.
 - **Method-level authorization** (`@PreAuthorize`) restricts owner-only actions (creating a property, bulk notices, dashboard/reports) to the `HOME_OWNER` role.
+- **Record-level authorization** (`AccessGuard`) decides who may touch a specific record. A role only says the caller *is* an owner, never that they own *this* property, so every check walks record, unit, property, owner. See [Who can access what](#who-can-access-what).
+- **Unauthenticated requests get a JSON 401** with `code` `AUTHENTICATION_REQUIRED` or `SESSION_EXPIRED`, so the frontend can send the user back to sign in. A signed-in caller reaching for someone else's record gets a 403.
+- **Money inputs are validated at the edge**: amounts must be positive with at most 2 decimal places, and bills generated from a meter reading are rounded to the cent (and rejected if they round to zero) so every bill can actually be paid.
+- **A half-finished booking is rolled back.** If the money has moved but a local step fails, the deposit hold and rent application made by that attempt are undone, and the transfer remembers how the payment was split, so the retry with the same `reference` finishes it without applying anything twice.
 - **The property owner's wallet destination is never taken from the request or from a freely-edited profile field** — it is resolved from auth-service via the owner's own `userId` at payment time.
 - **Every payment is idempotent by reference**, closing off retry-driven double-charging as a failure mode entirely.
 - **Stateless sessions** — no server-side session state, fully horizontally scalable.
+
+### Who can access what
+
+| Record | Who can read or change it |
+|---|---|
+| Property, units, leases, deposits, occupancy history | The owner of the property (or an admin) manages them. A tenant can read what concerns their own lease or unit. |
+| Rent due, payment history, rent schedule, notices, maintenance, inspections | The property's owner, plus the tenant concerned. Inspections also go to the person who scheduled or was assigned them. |
+| A tenant's profile, leases, bills, notices and requests | The tenant, an admin, or an owner they rent from. An owner only ever sees the part tied to their own properties. |
+| The tenant's total rent summary (`/rent/balance/tenant/{id}`) | The tenant or an admin. It adds up balances across every landlord, so owners use the per-lease and per-unit balances. |
+| An owner profile by id (`/owners/{id}`) | The owner or an admin, since it carries bank details. |
+| Blacklist entries | Any registered owner can look a tenant up when screening. Only the owner who listed a tenant (or an admin) can remove them, and an owner's list shows only their own entries. |
+| Work orders | The unit's owner, the assigned technician, and (read only) the tenant who raised the request. |
+| `/system/health/details` | Admins only. `/system/health` stays public and returns status only. |
 
 ## Project structure
 
@@ -449,7 +500,7 @@ premisave-property-management-service/
 │   ├── dto/               # Request/response DTOs
 │   ├── entity/            # MongoDB documents
 │   ├── repository/        # Spring Data MongoDB repositories
-│   ├── security/          # JWT filter & service
+│   ├── security/          # JWT filter & service, AccessGuard (record-level access), 401 entry point
 │   ├── exception/         # Domain exceptions + GlobalExceptionHandler
 │   └── PremisavePropertyManagementApplication.java
 ├── src/main/resources/
@@ -490,16 +541,82 @@ This means the wallet-service call either timed out or the connection was lost m
 Confirm the property is `spring.mongodb.uri`, not `spring.data.mongodb.uri` — Spring Boot 4 moved MongoDB's connection properties out of the Spring Data namespace into their own `spring.mongodb.*` prefix.
 </details>
 
+<details>
+<summary><b>App fails to start: "JWT_SECRET is not set" or "INTERNAL_API_KEY is not set"</b></summary>
+
+Both are required and the service stops on purpose when either is blank. Set `JWT_SECRET` to the value auth-service signs tokens with, and `INTERNAL_API_KEY` to the key shared with auth-service and wallet-service. Check that the `.env` line has no quotes or trailing spaces and that the file sits in the working directory.
+</details>
+
+<details>
+<summary><b>App fails to start on the <code>wallet_transfers</code> index</b></summary>
+
+The unique index on `reference` could not be created, almost always because two existing rows share a reference. Find them with an aggregation that groups `wallet_transfers` by `reference` and keeps counts above 1, resolve the duplicates, then restart. The service will not run without this index, because it is what stops a duplicate payment under concurrent retries.
+</details>
+
+<details>
+<summary><b>Startup warning: Could not create index on '...'</b></summary>
+
+Another index could not be built, usually because existing rows already break a unique rule (two owners with one `userId`, for example). The service starts normally and the other indexes are still created. Clean up the duplicates and restart to get the missing index.
+</details>
+
+<details>
+<summary><b>Every call returns 401 with code SESSION_EXPIRED or AUTHENTICATION_REQUIRED</b></summary>
+
+`SESSION_EXPIRED` means the token was present but expired, so the app should send the user back to sign in. `AUTHENTICATION_REQUIRED` means there was no usable token: none sent, a malformed header, or a signature that does not verify. In the last case check that `JWT_SECRET` is identical to auth-service's. A token that fails verification is logged as a warning ("Rejected an invalid token"); an expired one is logged at `DEBUG`.
+</details>
+
+<details>
+<summary><b>A signed-in user gets 403 on a record they expect to reach</b></summary>
+
+Access is decided per record, not just by role. An owner reaches a property only if its `ownerId` is their owner profile, and a tenant reaches a lease or unit only if they are the tenant on it. See [Who can access what](#who-can-access-what). A record that does not exist is a 404, so a 403 means it exists but belongs to someone else.
+</details>
+
+<details>
+<summary><b>The browser blocks calls with a CORS error</b></summary>
+
+Add the exact origin of the frontend (scheme, host and port) to `CORS_ALLOWED_ORIGINS`, comma separated, and restart. A single `*` allows every origin but turns credentials off, so use it only for local experiments.
+</details>
+
+<details>
+<summary><b><code>GET /system/test-token</code> returns 404</b></summary>
+
+It is off by default. Set `SYSTEM_TEST_TOKEN_ENABLED=true` while developing, and leave it off in production.
+</details>
+
+## Upgrading from earlier deliveries
+
+* **Set the new variables.** `CORS_ALLOWED_ORIGINS` has development defaults, so set it to the real frontend address before deploying. `LOG_LEVEL` now defaults to `INFO`. `SYSTEM_TEST_TOKEN_ENABLED` defaults to `false`. Utility rates default to `0.15` (electricity) and `1.50` (water) in USD.
+* **Startup is stricter.** A blank `JWT_SECRET` or `INTERNAL_API_KEY` now stops the service. Deployments that relied on a blank value need a real one.
+* **Unauthenticated calls now get a JSON 401** with `code` `AUTHENTICATION_REQUIRED` or `SESSION_EXPIRED`, where the old build answered 403. Frontends that treated 403 as "sign in again" should switch to the code.
+* **Access is checked per record.** Endpoints that used to accept any signed-in owner or tenant now check the record. Two responses became narrower on purpose: `/owners/{id}` is for the owner or an admin, and the tenant rent summary `/rent/balance/tenant/{id}` is for the tenant or an admin.
+* **Blacklist entries are scoped to the owner who created them.** New entries record `createdByOwnerId`. Entries created before the upgrade have none, so only an admin can remove or list them.
+* **Indexes are created at startup.** If your data already breaks a unique rule you will see a warning for that index (see [Troubleshooting](#troubleshooting)); the service still starts.
+* **Retried payments reuse the saved split.** `wallet_transfers` rows now store how a payment was divided between deposit and rent, so a retry with the same `reference` finishes the booking without applying anything twice. Rows written before the upgrade have no split and fall back to recomputing it, as before.
+* **Bills from meter readings are rounded to the cent** and rejected if they round to zero. Money fields in requests accept at most 2 decimal places.
+* **Spring Boot 4.1.1.** MongoDB settings use `spring.mongodb.uri`, and JSON handling is Jackson 3.
+* **No SMS and no generated password.** Twilio and SMS were removed, and the default Spring Security generated password no longer appears in the log. Remove any `TWILIO_*` variables from `.env`.
+
+## Known limits
+
+* **Deposit refunds.** A refund is recorded locally and does not yet move money out of the owner's wallet. It has to be settled outside this service.
+* **Standalone deposits.** `POST /api/v1/security-deposits` books a deposit with no wallet transfer. Only deposits taken as part of a wallet-funded rent payment move money.
+* **Crash during a booking.** A failed step after the money has moved is rolled back in code, and a retry with the same `reference` completes it. A JVM crash between two steps cannot be undone that way. Closing that gap fully needs MongoDB transactions, which need a replica set.
+* **Cash and off-platform rent.** Payments are wallet only, so an owner cannot log a rent payment made outside the platform.
+* **Currency.** USD only. There is no conversion and no other currency is recorded.
+* **Notifications.** Emails are sent in the background once and are not retried. A failed email is logged and never fails the payment that triggered it.
+* **Sibling services.** The listing and booking Feign clients exist, but their calls are not exercised end to end yet.
+
 ## Roadmap ideas
 
 Real, currently-known gaps and follow-ups, not commitments:
 
-- [ ] Security deposit refunds are recorded locally but do not yet move money out of the owner's wallet — a refund still needs to be settled outside this service
-- [ ] The standalone `POST /security-deposits` endpoint books a deposit with no corresponding wallet transfer, separate from the wallet-funded flow used by rent payments
-- [ ] Manual/cash rent recording is no longer supported now that payments are wallet-only — an owner cannot log an off-platform payment
-- [ ] A known upstream Spring Framework 7 issue (spring-framework#35287) can turn a method-level `@PreAuthorize` denial into a 500 instead of a 403 — worth a regression test once a fix ships
+- [ ] Move deposit refunds out of the owner's wallet back to the tenant through the wallet service (see [Known limits](#known-limits))
+- [ ] Route the standalone `POST /security-deposits` endpoint through a wallet transfer, like the deposits taken with rent
+- [ ] Let an owner record an off-platform (cash) rent payment, clearly marked as not wallet-settled
+- [ ] A known upstream Spring Framework 7 issue (spring-framework#35287) can turn a method-level `@PreAuthorize` denial into a 500 instead of a 403. `GlobalExceptionHandler` now maps `AccessDeniedException` to 403, so it is covered here; worth re-checking once a fix ships
+- [ ] Run on a MongoDB replica set and wrap each booking in a transaction, which closes the crash-mid-booking gap
 - [ ] RabbitMQ queues are declared (`property.auth.queue`, `property.wallet.queue`, `property.booking.queue`) ahead of an event-driven flow that isn't wired up yet
-- [ ] `listing-service` and `booking-service` Feign clients exist but their call sites (property→listing sync, unit availability checks) are not yet exercised end-to-end
+- [ ] `listing-service` and `booking-service` Feign clients exist but their call sites (property to listing sync, unit availability checks) are not yet exercised end-to-end
 
 ## Contributing
 

@@ -3,6 +3,7 @@ package com.premisave.property.controller;
 import com.premisave.property.dto.request.LeaseRentPaymentRequest;
 import com.premisave.property.dto.response.LeaseRentPaymentResponse;
 import com.premisave.property.dto.response.PaymentDueResponse;
+import com.premisave.property.security.AccessGuard;
 import com.premisave.property.service.LeaseRentUnitPaymentService;
 import com.premisave.property.service.TenantService;
 import com.premisave.property.health.ExternalService;
@@ -24,9 +25,11 @@ public class LeaseRentController {
 
     private final LeaseRentUnitPaymentService leaseRentUnitPaymentService;
     private final TenantService tenantService;
+    private final AccessGuard guard;
 
     @GetMapping("/due/{leaseId}")
     public ResponseEntity<PaymentDueResponse> getPaymentDue(@PathVariable String leaseId) {
+        guard.requireLeaseParticipant(leaseId);
         return ResponseEntity.ok(leaseRentUnitPaymentService.getPaymentDue(leaseId));
     }
 
@@ -42,6 +45,7 @@ public class LeaseRentController {
 
     @GetMapping("/history/{leaseId}")
     public ResponseEntity<List<LeaseRentPaymentResponse>> getPaymentHistory(@PathVariable String leaseId) {
+        guard.requireLeaseParticipant(leaseId);
         return ResponseEntity.ok(leaseRentUnitPaymentService.getPaymentHistory(leaseId));
     }
 

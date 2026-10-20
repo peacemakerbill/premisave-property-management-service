@@ -130,6 +130,29 @@ public class RentBalanceService {
      * no reliable way to know how long the unit has been occupied without
      * a schedule, so we start the clock from the first payment/charge event.
      */
+    /** A detached copy of the balance's mutable fields, for restoring if a payment fails to book. */
+    public RentBalance snapshot(RentBalance balance) {
+        RentBalance copy = new RentBalance();
+        copy.setId(balance.getId());
+        copy.setBalance(balance.getBalance());
+        copy.setLastChargeAt(balance.getLastChargeAt());
+        copy.setLastChargeAmount(balance.getLastChargeAmount());
+        copy.setLastPaymentAt(balance.getLastPaymentAt());
+        copy.setLastPaymentAmount(balance.getLastPaymentAmount());
+        return copy;
+    }
+
+    public void restore(RentBalance snapshot) {
+        rentBalanceRepository.findById(snapshot.getId()).ifPresent(current -> {
+            current.setBalance(snapshot.getBalance());
+            current.setLastChargeAt(snapshot.getLastChargeAt());
+            current.setLastChargeAmount(snapshot.getLastChargeAmount());
+            current.setLastPaymentAt(snapshot.getLastPaymentAt());
+            current.setLastPaymentAmount(snapshot.getLastPaymentAmount());
+            rentBalanceRepository.save(current);
+        });
+    }
+
     @Transactional
     public void chargeElapsedMonthsIfNeeded(RentBalance balance, BigDecimal monthlyRent) {
         LocalDateTime now = LocalDateTime.now();

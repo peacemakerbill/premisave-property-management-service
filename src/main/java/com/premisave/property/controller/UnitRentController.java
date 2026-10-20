@@ -3,6 +3,7 @@ package com.premisave.property.controller;
 import com.premisave.property.dto.request.UnitRentPaymentRequest;
 import com.premisave.property.dto.response.PaymentDueResponse;
 import com.premisave.property.dto.response.UnitRentPaymentResponse;
+import com.premisave.property.security.AccessGuard;
 import com.premisave.property.service.TenantService;
 import com.premisave.property.service.UnitRentPaymentService;
 import com.premisave.property.health.ExternalService;
@@ -24,6 +25,7 @@ public class UnitRentController {
 
     private final UnitRentPaymentService unitRentPaymentService;
     private final TenantService tenantService;
+    private final AccessGuard guard;
 
     @GetMapping("/due/{rentalUnitId}")
     public ResponseEntity<PaymentDueResponse> getMyPaymentDue(@PathVariable String rentalUnitId,
@@ -35,6 +37,9 @@ public class UnitRentController {
     @GetMapping("/due/{rentalUnitId}/tenant/{tenantId}")
     public ResponseEntity<PaymentDueResponse> getPaymentDueForTenant(@PathVariable String rentalUnitId,
                                                                       @PathVariable String tenantId) {
+        if (!guard.isSelf(tenantId)) {
+            guard.requireUnitManager(rentalUnitId);
+        }
         return ResponseEntity.ok(unitRentPaymentService.getPaymentDue(rentalUnitId, tenantId));
     }
 
@@ -49,6 +54,7 @@ public class UnitRentController {
 
     @GetMapping("/history/{rentalUnitId}")
     public ResponseEntity<List<UnitRentPaymentResponse>> getPaymentHistory(@PathVariable String rentalUnitId) {
+        guard.requireUnitParticipant(rentalUnitId);
         return ResponseEntity.ok(unitRentPaymentService.getPaymentHistory(rentalUnitId));
     }
 

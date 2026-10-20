@@ -3,6 +3,7 @@ package com.premisave.property.controller;
 import com.premisave.property.dto.request.CreateLeaseRequest;
 import com.premisave.property.dto.request.UpdateLeaseRequest;
 import com.premisave.property.dto.response.LeaseResponse;
+import com.premisave.property.security.AccessGuard;
 import com.premisave.property.service.LeaseService;
 import com.premisave.property.service.OwnerService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,9 +23,12 @@ public class LeaseController {
 
     private final LeaseService leaseService;
     private final OwnerService ownerService;
+    private final AccessGuard guard;
 
+    // Only the owner of the unit or property being leased (or an admin).
     @PostMapping
     public ResponseEntity<LeaseResponse> createLease(@Valid @RequestBody CreateLeaseRequest request) {
+        guard.requireManagerOfTarget(request.getRentalUnitId(), request.getPropertyId());
         return ResponseEntity.ok(leaseService.createLease(request));
     }
 
@@ -42,24 +46,33 @@ public class LeaseController {
         return ResponseEntity.ok(leaseService.getLeasesForOwner(ownerId));
     }
 
+    // The lease's tenant, or whoever manages the property.
     @GetMapping("/{id}")
     public ResponseEntity<LeaseResponse> getLease(@PathVariable String id) {
+        guard.requireLeaseParticipant(id);
         return ResponseEntity.ok(leaseService.getLease(id));
     }
 
+    // The tenant sees all of their leases. A landlord sees only the leases on their own properties.
     @GetMapping("/tenant/{tenantId}")
     public ResponseEntity<List<LeaseResponse>> getLeasesByTenant(@PathVariable String tenantId) {
-        return ResponseEntity.ok(leaseService.getLeasesByTenant(tenantId));
+        guard.requireTenantSelfOrLandlord(tenantId);
+        if (guard.seesAllOf(tenantId)) {
+            return ResponseEntity.ok(leaseService.getLeasesByTenant(tenantId));
+        }
+        return ResponseEntity.ok(leaseService.getLeasesByTenantInProperties(tenantId, guard.ownedPropertyIds()));
     }
 
     @PatchMapping("/{id}")
     public ResponseEntity<LeaseResponse> updateLease(@PathVariable String id,
                                                        @RequestBody UpdateLeaseRequest request) {
+        guard.requireLeaseManager(id);
         return ResponseEntity.ok(leaseService.updateLease(id, request));
     }
 
     @PostMapping("/{id}/terminate")
     public ResponseEntity<Map<String, Object>> terminateLease(@PathVariable String id) {
+        guard.requireLeaseManager(id);
         LeaseResponse response = leaseService.terminateLease(id);
         return ResponseEntity.ok(Map.of(
                 "message", "Lease has been terminated successfully",

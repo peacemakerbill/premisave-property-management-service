@@ -46,6 +46,11 @@ public class WalletTransfer {
     private String walletTransactionId;
     private String failureReason;
     private String bookedRecordId;    // LeaseRentUnitPayment / UnitRentPayment / UtilityBill id
+    // How the amount was split when the transfer was created (null for bill payments and for
+    // records created before this field existed). A retry after a half-finished booking reads
+    // the split from here instead of recomputing it from state the first attempt already changed.
+    private BigDecimal depositPortion;
+    private BigDecimal rentPortion;
 
     // While set and in the future, another request is actively processing
     // this reference. Expires on its own if a process dies mid-flight.
