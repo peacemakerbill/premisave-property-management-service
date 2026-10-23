@@ -1,0 +1,1623 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Premisave Property Console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231d4ed8'/%3E%3Cpath d='M6 16l10-8 10 8v9H6z' fill='%23ffffff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f4f5f7;
+  --bg-2: #eceef2;
+  --panel: #ffffff;
+  --panel-2: #f8f9fb;
+  --ink: #161a22;
+  --muted: #5d6675;
+  --line: #e2e5ea;
+  --line-2: #cbd0d8;
+  --side: #fbfbfc;
+  --side-2: #fbfbfc;
+  --side-ink: #2b3240;
+  --side-muted: #7d8696;
+  --brand: #1d4ed8;
+  --brand-2: #1740b3;
+  --brass: #1d4ed8;
+  --brass-soft: #eaf0fe;
+  --brass-ink: #1b3fa3;
+  --ok: #0c7a43;
+  --ok-bg: #e5f4ec;
+  --warn: #946200;
+  --warn-bg: #fcf1d6;
+  --bad: #b3261e;
+  --bad-bg: #fce9e7;
+  --info: #1d4ed8;
+  --info-bg: #eaf0fe;
+  --shadow: none;
+  --pop: 0 16px 48px rgba(16, 24, 40, .22);
+  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: var(--sans);
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --radius: 6px;
+}
+[data-theme="dark"] {
+  --bg: #0d1015;
+  --bg-2: #12161c;
+  --panel: #14181f;
+  --panel-2: #191e26;
+  --ink: #e7eaf0;
+  --muted: #8b94a4;
+  --line: #242a34;
+  --line-2: #323a47;
+  --side: #0a0d11;
+  --side-2: #0a0d11;
+  --side-ink: #d4d9e2;
+  --side-muted: #727b8b;
+  --brand: #5b8def;
+  --brand-2: #7ca3f5;
+  --brass: #6d9bff;
+  --brass-soft: #16233f;
+  --brass-ink: #a9c3ff;
+  --ok: #4cc38a;
+  --ok-bg: #11291d;
+  --warn: #e3ac45;
+  --warn-bg: #2f2410;
+  --bad: #f08278;
+  --bad-bg: #351816;
+  --info: #7ca3f5;
+  --info-bg: #16233f;
+  --pop: 0 16px 48px rgba(0, 0, 0, .6);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 13.5px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, .mono { font-family: var(--mono); font-size: .92em; }
+h1, h2, h3 { font-family: var(--sans); font-weight: 600; margin: 0; letter-spacing: -.005em; }
+.hidden { display: none !important; }
+
+/* shell */
+.app { display: grid; grid-template-columns: 240px 1fr; height: 100vh; }
+.side { background: var(--side); color: var(--side-ink); display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); }
+.brandbar { padding: 14px 16px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); }
+.crest { width: 28px; height: 28px; border-radius: 6px; background: var(--brand); color: #fff; display: grid; place-items: center; flex: none; }
+[data-theme="dark"] .crest { color: #0a0d11; }
+.brandbar b { font: 600 14px/1.2 var(--sans); display: block; color: var(--ink); }
+.brandbar small { color: var(--side-muted); font-size: 11.5px; }
+.nav { overflow: auto; padding: 6px 8px 16px; flex: 1; }
+.nav h4 { margin: 16px 8px 4px; font: 600 11.5px/1.2 var(--sans); color: var(--side-muted); }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 5px; color: var(--side-ink); cursor: pointer; font-size: 13px; position: relative; }
+.nav a:hover { background: var(--bg-2); text-decoration: none; }
+.nav a.on { background: var(--brass-soft); color: var(--brass-ink); font-weight: 600; }
+.nav a .n { margin-left: auto; font-size: 11px; color: var(--side-muted); font-variant-numeric: tabular-nums; }
+.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.sidefoot { padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--side-muted); }
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.top { display: flex; align-items: center; gap: 8px; padding: 8px 20px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; min-height: 48px; }
+.top .grow { flex: 1; }
+.menu-btn { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 7px; padding: 3px 9px; border-radius: 5px; background: var(--panel); border: 1px solid var(--line); font-size: 12.5px; cursor: pointer; white-space: nowrap; max-width: 100%; }
+.chip:hover { border-color: var(--line-2); background: var(--panel-2); }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-2); flex: none; }
+.chip .dot.up { background: var(--ok); }
+.chip .dot.down { background: var(--bad); }
+.chip .dot.warn { background: var(--warn); }
+.chip b { font-weight: 600; }
+.chip .lbl { color: var(--muted); }
+.ctxbar { display: flex; gap: 6px; padding: 6px 20px; background: var(--panel-2); border-bottom: 1px solid var(--line); overflow-x: auto; align-items: center; }
+.ctxbar .lbl { font: 600 11.5px/1 var(--sans); color: var(--muted); margin-right: 4px; flex: none; }
+.ctxchip { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; font-size: 12px; display: inline-flex; gap: 6px; cursor: pointer; flex: none; color: var(--muted); }
+.ctxchip:hover { border-color: var(--line-2); }
+.ctxchip.set { color: var(--ink); border-color: var(--line-2); }
+.ctxchip span { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.ctxchip.set span { color: var(--brass-ink); }
+.content { overflow: auto; padding: 24px 28px 64px; flex: 1; min-height: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; }
+
+/* page header */
+.ph { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+.ph h1 { font-size: 22px; line-height: 1.2; }
+.ph p { margin: 6px 0 0; color: var(--muted); max-width: 72ch; }
+.ph .grow { flex: 1; min-width: 200px; }
+.eyebrow { font: 500 12px/1 var(--sans); color: var(--muted); margin-bottom: 8px; letter-spacing: 0; text-transform: none; }
+
+/* cards and layout */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.card > .hd { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; min-height: 46px; }
+.card > .hd h3 { font-size: 14px; }
+.card > .hd .sub { color: var(--muted); font-size: 12.5px; }
+.card > .bd { padding: 14px; }
+.card > .bd.flush { padding: 0; }
+.grid { display: grid; gap: 16px; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.spacer { flex: 1; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; background: var(--brand); color: #fff; border: 1px solid var(--brand); padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: 500; font-size: 13px; white-space: nowrap; }
+[data-theme="dark"] .btn { color: #0a0d11; }
+.btn:hover { background: var(--brand-2); border-color: var(--brand-2); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.ghost { background: var(--panel); color: var(--ink); border-color: var(--line-2); }
+.btn.ghost:hover { background: var(--panel-2); border-color: var(--muted); }
+.btn.brass { background: var(--brand); border-color: var(--brand); color: #fff; }
+[data-theme="dark"] .btn.brass { color: #0a0d11; }
+.btn.danger { background: var(--panel); color: var(--bad); border-color: var(--line-2); }
+.btn.danger:hover { background: var(--bad-bg); border-color: var(--bad); }
+.btn.sm { padding: 3px 9px; font-size: 12px; }
+.iconbtn { background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 5px; cursor: pointer; color: var(--muted); display: inline-flex; gap: 4px; align-items: center; }
+.iconbtn:hover { background: var(--bg-2); color: var(--ink); }
+
+/* forms */
+.fld, select.fld, textarea.fld { width: 100%; background: var(--panel); border: 1px solid var(--line-2); border-radius: 5px; padding: 6px 9px; outline: none; }
+.fld:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brass-soft); }
+textarea.fld { min-height: 70px; resize: vertical; }
+.f { margin-bottom: 12px; }
+.f > label { display: flex; gap: 6px; align-items: baseline; font-size: 12.5px; font-weight: 500; margin-bottom: 4px; }
+.f > label .req { color: var(--bad); }
+.f > label .bind { margin-left: auto; font: 400 11px var(--mono); color: var(--muted); }
+.f .hint { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.fgroup { border: 1px solid var(--line); background: var(--panel-2); border-radius: 5px; padding: 10px 12px 2px; margin-bottom: 12px; }
+.fgroup > .gl { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.checks { display: flex; gap: 12px; flex-wrap: wrap; }
+.checks label { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; }
+
+/* badges */
+.badge { display: inline-block; padding: 0 6px; border-radius: 3px; font: 600 10.5px/18px var(--mono); letter-spacing: .02em; text-transform: uppercase; }
+.m-GET { background: var(--info-bg); color: var(--info); }
+.m-POST { background: var(--ok-bg); color: var(--ok); }
+.m-PATCH, .m-PUT { background: var(--warn-bg); color: var(--warn); }
+.m-DELETE { background: var(--bad-bg); color: var(--bad); }
+.role { background: transparent; color: var(--muted); border: 1px solid var(--line); font-family: var(--sans); text-transform: none; font-weight: 500; font-size: 11.5px; letter-spacing: 0; }
+.role.owner, .role.admin { color: var(--ink); border-color: var(--line-2); }
+.pill { display: inline-block; padding: 0 7px; border-radius: 3px; font-size: 12px; line-height: 20px; font-weight: 500; background: var(--bg-2); border: 1px solid transparent; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.info { background: var(--info-bg); color: var(--info); }
+
+/* tables */
+.tw { overflow: auto; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.t th { text-align: left; font: 600 12px/1 var(--sans); color: var(--muted); padding: 9px 12px; background: var(--panel-2); border-bottom: 1px solid var(--line); white-space: nowrap; position: sticky; top: 0; }
+table.t td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+table.t tr.data { cursor: pointer; }
+table.t tr.data:hover td { background: var(--panel-2); }
+table.t tr.sel td { background: var(--brass-soft); }
+table.t td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.t tr.detail td { background: var(--panel-2); max-width: none; white-space: normal; }
+.idc { font-family: var(--mono); font-size: 12px; color: var(--muted); cursor: copy; }
+
+/* key value */
+.kv { display: grid; grid-template-columns: minmax(120px, 190px) 1fr; gap: 0; font-size: 13px; }
+.kv > div { padding: 6px 0; border-bottom: 1px solid var(--line); word-break: break-word; }
+.kv > .k { color: var(--muted); padding-right: 12px; }
+.sub-kv { margin: 2px 0; padding: 2px 12px; border-left: 2px solid var(--line-2); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.tile .l { font: 500 12px/1.2 var(--sans); color: var(--muted); }
+.tile .v { font: 600 22px/1.25 var(--sans); margin-top: 6px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.tile.gold { border-left: 3px solid var(--brand); }
+.bar { height: 6px; background: var(--bg-2); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--brand); }
+
+/* action cards */
+.acts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.act { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.act:hover { border-color: var(--brand); }
+.act .nm { font-weight: 500; font-size: 13px; }
+.act .pt { font-family: var(--mono); font-size: 11.5px; color: var(--muted); word-break: break-all; }
+.act .tg { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+.grp { font: 600 12px/1 var(--sans); color: var(--muted); margin: 18px 0 8px; }
+
+/* drawer */
+.scrim { position: fixed; inset: 0; background: rgba(10, 14, 20, .4); z-index: 40; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(620px, 100vw); background: var(--panel); z-index: 41; display: flex; flex-direction: column; box-shadow: var(--pop); border-left: 1px solid var(--line); }
+.drawer > .dh { display: flex; gap: 10px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.drawer > .dh h2 { font-size: 16px; line-height: 1.3; }
+.drawer > .db { overflow: auto; padding: 18px; flex: 1; }
+.pathline { font-family: var(--mono); font-size: 12px; color: var(--muted); word-break: break-all; margin: 6px 0 12px; padding: 6px 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 14px 0 12px; }
+.tabs button { background: none; border: none; padding: 6px 12px; cursor: pointer; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button.on { color: var(--ink); border-bottom-color: var(--brand); }
+pre.json { margin: 0; background: #0f141b; color: #d9e0ea; border-radius: 5px; padding: 12px 14px; overflow: auto; font: 12px/1.6 var(--mono); max-height: 460px; white-space: pre-wrap; word-break: break-word; }
+.jk { color: #8fb4ff; } .js { color: #a5d6a7; } .jn { color: #f2c27b; } .jb { color: #ef9a9a; }
+.resbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 7px 12px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line); margin-bottom: 10px; }
+.sc { font-weight: 600; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+.sc.ok { color: var(--ok); } .sc.warn { color: var(--warn); } .sc.bad { color: var(--bad); }
+.note { border: 1px solid var(--line); border-left: 3px solid var(--muted); background: var(--panel-2); color: var(--ink); padding: 8px 12px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
+.note.bad { border-left-color: var(--bad); background: var(--bad-bg); border-color: transparent; border-left-width: 3px; color: var(--bad); }
+.note.info { border-left-color: var(--brand); background: var(--info-bg); border-color: transparent; color: var(--brass-ink); }
+.note.ok { border-left-color: var(--ok); background: var(--ok-bg); border-color: transparent; color: var(--ok); }
+.desc p { margin: 0 0 8px; }
+.desc code { background: var(--bg-2); padding: 0 4px; border-radius: 3px; }
+
+/* modal and toasts */
+.modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(10, 14, 20, .45); }
+.modal > .box { width: min(520px, 100%); max-height: 90vh; overflow: auto; background: var(--panel); border-radius: 8px; box-shadow: var(--pop); border: 1px solid var(--line); }
+.modal .box > .mh { padding: 12px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+.modal .box > .mb { padding: 18px; }
+.toasts { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+.toast { background: #1b212b; color: #fff; padding: 8px 14px; border-radius: 5px; box-shadow: var(--pop); font-size: 13px; max-width: 80vw; }
+.toast.err { background: var(--bad); color: #fff; }
+.toast.ok { background: #0c6b3b; }
+
+/* sign in */
+.signin { max-width: 400px; margin: 0 auto; display: block; border-radius: 8px; overflow: hidden; box-shadow: none; border: 1px solid var(--line); background: var(--panel); }
+.signin .hero { display: none; }
+.signin .form { background: var(--panel); padding: 28px; }
+.wordmark { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.wordmark b { font-size: 16px; font-weight: 600; }
+.preset { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.preset button { border: 1px solid var(--line-2); background: var(--panel); border-radius: 4px; padding: 3px 10px; cursor: pointer; font-size: 12.5px; }
+.preset button:hover { border-color: var(--brand); color: var(--brand); }
+.sess { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+.sess:last-child { border-bottom: none; }
+.sess.on { background: var(--brass-soft); }
+.av { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-2); color: var(--ink); border: 1px solid var(--line-2); display: grid; place-items: center; font-weight: 600; font-size: 12.5px; flex: none; }
+.steps { display: flex; flex-direction: column; }
+.step { display: flex; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--line); align-items: flex-start; }
+.step:last-child { border-bottom: none; }
+.step .no { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-2); display: grid; place-items: center; font-weight: 500; flex: none; font-size: 12px; color: var(--muted); }
+.step.done .no { background: var(--ok); border-color: var(--ok); color: #fff; }
+.step .tx { flex: 1; min-width: 0; }
+.step .tx b { display: block; font-weight: 500; }
+.step .tx span { color: var(--muted); font-size: 12.5px; }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line-2); border-top-color: var(--brand); animation: sp .7s linear infinite; display: inline-block; vertical-align: -2px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.logrow { display: grid; grid-template-columns: 60px 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.logrow:hover { background: var(--panel-2); }
+.logrow .u { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+.logrow .s { font-size: 11.5px; color: var(--muted); }
+.receipt { border: 1px solid var(--ok); border-left-width: 3px; border-radius: 5px; padding: 12px 16px; background: var(--ok-bg); }
+.receipt h3 { color: var(--ok); font-size: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 5px; overflow: hidden; }
+.seg button { background: var(--panel); border: none; padding: 5px 14px; cursor: pointer; font-weight: 500; font-size: 12.5px; color: var(--muted); }
+.seg button.on { background: var(--brand); color: #fff; }
+[data-theme="dark"] .seg button.on { color: #0a0d11; }
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .side { position: fixed; inset: 0 auto 0 0; width: 260px; z-index: 50; transform: translateX(-100%); transition: transform .2s; }
+  .side.open { transform: none; box-shadow: var(--pop); }
+  .menu-btn { display: inline-flex; }
+  .content { padding: 16px 14px 60px; }
+  .top, .ctxbar { padding-left: 14px; padding-right: 14px; }
+  .cols2 { grid-template-columns: 1fr; }
+  .kv { grid-template-columns: 110px 1fr; }
+}
+.signin form .btn[type=submit] { width: 100%; justify-content: center; padding: 8px 12px; }
+
+/* id finder */
+.idrow { display: flex; gap: 6px; align-items: flex-start; }
+.idrow > .fld, .idrow > textarea { flex: 1; min-width: 0; }
+.idrow > .btn { flex: none; align-self: flex-start; padding: 6px 10px; }
+.picklist { max-height: 52vh; overflow: auto; border: 1px solid var(--line); border-radius: 5px; }
+.picklist:empty { display: none; }
+.pickrow { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.pickrow:last-child { border-bottom: none; }
+.pickrow:hover { background: var(--brass-soft); }
+.pickrow .pm { flex: 1; min-width: 0; }
+.pickrow .pl { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickrow .ps { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickrow .idc { flex: none; }
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const SPEC = {"endpoints":[{"id":"owners.create-owner-profile-from-my-account","svc":"property","page":"Owners","name":"Create owner profile from my account","method":"POST","path":"/api/v1/owners/quick","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"owners.create-owner-profile","svc":"property","page":"Owners","name":"Create owner profile","method":"POST","path":"/api/v1/owners","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"fullName","label":"Full Name","required":true,"value":"Bill Graham peacemaker","type":"text"},{"key":"phoneNumber","label":"Phone Number","required":true,"value":"+254722334458","type":"text"},{"key":"email","label":"Email","required":true,"bind":"email","value":"","type":"email"},{"key":"address","label":"Address","required":false,"type":"group","fields":[{"key":"street","label":"Street","required":false,"value":"10 Westlands Rd","type":"text"},{"key":"city","label":"City","required":false,"value":"Nairobi","type":"text"},{"key":"state","label":"State","required":false,"value":"Nairobi County","type":"text"},{"key":"country","label":"Country","required":false,"value":"Kenya","type":"text"},{"key":"postalCode","label":"Postal Code","required":false,"value":"00200","type":"text"}]}],"notes":[]}},{"id":"owners.get-my-owner-profile","svc":"property","page":"Owners","name":"Get my owner profile","method":"GET","path":"/api/v1/owners/me","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"owners.check-that-my-owner-profile-exists","svc":"property","page":"Owners","name":"Check that my owner profile exists","method":"GET","path":"/api/v1/owners/me/exists","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"owners.check-owner-profile-sync-status","svc":"property","page":"Owners","name":"Check owner profile sync status","method":"GET","path":"/api/v1/owners/me/sync-status","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"owners.sync-owner-profile-from-my-account","svc":"property","page":"Owners","name":"Sync owner profile from my account","method":"POST","path":"/api/v1/owners/me/sync","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"owners.update-owner-profile","svc":"property","page":"Owners","name":"Update owner profile","method":"PATCH","path":"/api/v1/owners/{{owner_id}}","query":[],"params":[{"key":"owner_id","label":"Owner id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"fullName","label":"Full Name","required":false,"value":"Bill Graham Peacemaker","type":"text"},{"key":"phoneNumber","label":"Phone Number","required":false,"value":"+254722334455","type":"text"},{"key":"email","label":"Email","required":false,"bind":"email","value":"","type":"email"},{"key":"address","label":"Address","type":"group","fields":[{"key":"street","label":"Street","type":"text","required":false,"value":""},{"key":"city","label":"City","type":"text","required":false,"value":""},{"key":"state","label":"State or county","type":"text","required":false,"value":""},{"key":"country","label":"Country","type":"text","required":false,"value":""},{"key":"postalCode","label":"Postal code","type":"text","required":false,"value":""}],"required":false,"value":""},{"key":"bankDetails","label":"Bank details","type":"group","fields":[{"key":"bankName","label":"Bank name","type":"text","required":false,"value":""},{"key":"accountNumber","label":"Account number","type":"text","required":false,"value":""},{"key":"accountName","label":"Account name","type":"text","required":false,"value":""},{"key":"branchCode","label":"Branch code","type":"text","required":false,"value":""}],"required":false,"value":""}],"notes":["Optional: \"address\": { \"street\", \"city\", \"state\", \"country\", \"postalCode\" }","Optional: \"bankDetails\": { \"bankName\", \"accountNumber\", \"accountName\", \"branchCode\" }"]}},{"id":"owners.get-owner-by-id","svc":"property","page":"Owners","name":"Get owner by ID","method":"GET","path":"/api/v1/owners/{{owner_id}}","query":[],"params":[{"key":"owner_id","label":"Owner id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"Returns bank details, so it is limited to the owner themselves or an admin. Use **Get my owner profile** for your own.","body":null},{"id":"tenants.create-tenant-profile-from-my-account","svc":"property","page":"Tenants","name":"Create tenant profile from my account","method":"POST","path":"/api/v1/tenants/quick-register","query":[],"params":[],"role":"any","who":"Bearer token (the tenant)","desc":"","body":null},{"id":"tenants.create-tenant-profile","svc":"property","page":"Tenants","name":"Create tenant profile","method":"POST","path":"/api/v1/tenants/register","query":[],"params":[],"role":"any","who":"Bearer token (the tenant)","desc":"","body":{"fields":[{"key":"fullName","label":"Full Name","required":true,"value":"Bill Graham Peacemaker","type":"text"},{"key":"phoneNumber","label":"Phone Number","required":true,"value":"+254712345678","type":"text"},{"key":"email","label":"Email","required":true,"bind":"email","value":"","type":"email"},{"key":"idNumber","label":"Id Number","required":false,"value":"12345678","type":"text"},{"key":"currentAddress","label":"Current Address","required":false,"type":"group","fields":[{"key":"street","label":"Street","required":false,"value":"45 Kilimani Ave","type":"text"},{"key":"city","label":"City","required":false,"value":"Nairobi","type":"text"},{"key":"state","label":"State","required":false,"value":"Nairobi County","type":"text"},{"key":"country","label":"Country","required":false,"value":"Kenya","type":"text"},{"key":"postalCode","label":"Postal Code","required":false,"value":"00100","type":"text"}]}],"notes":[]}},{"id":"tenants.get-my-tenant-profile","svc":"property","page":"Tenants","name":"Get my tenant profile","method":"GET","path":"/api/v1/tenants/me","query":[],"params":[],"role":"any","who":"Bearer token (the tenant)","desc":"","body":null},{"id":"tenants.check-tenant-profile-sync-status","svc":"property","page":"Tenants","name":"Check tenant profile sync status","method":"GET","path":"/api/v1/tenants/me/sync-status","query":[],"params":[],"role":"any","who":"Bearer token (the tenant)","desc":"","body":null},{"id":"tenants.sync-tenant-profile-from-my-account","svc":"property","page":"Tenants","name":"Sync tenant profile from my account","method":"POST","path":"/api/v1/tenants/me/sync","query":[],"params":[],"role":"any","who":"Bearer token (the tenant)","desc":"","body":null},{"id":"tenants.update-my-tenant-profile","svc":"property","page":"Tenants","name":"Update my tenant profile","method":"PATCH","path":"/api/v1/tenants/me","query":[],"params":[],"role":"any","who":"Bearer token (the tenant)","desc":"","body":{"fields":[{"key":"fullName","label":"Full Name","required":false,"value":"Bill Graham Peacemaker II","type":"text"},{"key":"phoneNumber","label":"Phone Number","required":false,"value":"+254712345678","type":"text"},{"key":"email","label":"Email","required":false,"bind":"email","value":"","type":"email"},{"key":"occupation","label":"Occupation","required":false,"value":"Software Engineer","type":"text"}],"notes":[]}},{"id":"tenants.get-tenant-by-id","svc":"property","page":"Tenants","name":"Get tenant by ID","method":"GET","path":"/api/v1/tenants/{{tenant_id}}","query":[],"params":[{"key":"tenant_id","label":"Tenant id"}],"role":"any","who":"Bearer token (the tenant, or an owner they rent from)","desc":"","body":null},{"id":"properties.create-property","svc":"property","page":"Properties","name":"Create property","method":"POST","path":"/api/v1/properties","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"title","label":"Title","required":true,"value":"Industrial Area Warehouse","type":"text"},{"key":"description","label":"Description","required":false,"value":"Standalone 8,000 sq ft warehouse with loading bay and 24-hour security","type":"textarea"},{"key":"propertyType","label":"Property Type","required":true,"value":"WAREHOUSE","type":"select","options":["APARTMENT","HOUSE","VILLA","STUDIO","DUPLEX","BUNGALOW","TOWNHOUSE","PENTHOUSE","COTTAGE","MAISONETTE","LAND","FARM","WAREHOUSE","COMMERCIAL","OFFICE","SHOP","HOTEL","HOSTEL","PARKING"]},{"key":"address","label":"Address","required":true,"type":"group","fields":[{"key":"street","label":"Street","required":false,"value":"Enterprise Road","type":"text"},{"key":"city","label":"City","required":false,"value":"Nairobi","type":"text"},{"key":"state","label":"State","required":false,"value":"Nairobi County","type":"text"},{"key":"country","label":"Country","required":false,"value":"Kenya","type":"text"},{"key":"postalCode","label":"Postal Code","required":false,"value":"00500","type":"text"}]},{"key":"latitude","label":"Latitude","required":false,"type":"number","step":"any","value":-1.3167},{"key":"longitude","label":"Longitude","required":false,"type":"number","step":"any","value":36.85},{"key":"registrationNumber","label":"Registration Number","required":true,"value":"LC/IND/9012","type":"text"},{"key":"registrationType","label":"Registration Type","required":true,"value":"LEASE_CERTIFICATE","type":"select","options":["TITLE_DEED","LR_NUMBER","LEASE_CERTIFICATE","OTHER"]}],"notes":[]}},{"id":"properties.list-my-properties","svc":"property","page":"Properties","name":"List my properties","method":"GET","path":"/api/v1/properties/me","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"properties.get-property-by-id","svc":"property","page":"Properties","name":"Get property by ID","method":"GET","path":"/api/v1/properties/{{property_id}}","query":[],"params":[{"key":"property_id","label":"Property id"}],"role":"any","who":"Bearer token (the owner, or a tenant of it)","desc":"","body":null},{"id":"properties.update-property","svc":"property","page":"Properties","name":"Update property","method":"PATCH","path":"/api/v1/properties/{{property_id}}","query":[],"params":[{"key":"property_id","label":"Property id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"title","label":"Title","required":false,"value":"Sunrise Apartments - Updated","type":"text"},{"key":"description","label":"Description","required":false,"value":"Renovated common areas","type":"textarea"},{"key":"isActive","label":"Is Active","required":false,"type":"tri","value":true}],"notes":[]}},{"id":"properties.delete-property","svc":"property","page":"Properties","name":"Delete property","method":"DELETE","path":"/api/v1/properties/{{property_id}}","query":[],"params":[{"key":"property_id","label":"Property id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"rental-units.create-rental-unit","svc":"property","page":"Rental Units","name":"Create rental unit","method":"POST","path":"/api/v1/units/property/{{property_id}}","query":[],"params":[{"key":"property_id","label":"Property id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"unitNumber","label":"Unit Number","required":false,"value":"B1","type":"text"},{"key":"floor","label":"Floor","required":false,"value":"3","type":"text"},{"key":"rentAmount","label":"Rent Amount","required":true,"type":"number","step":"0.01","value":500},{"key":"securityDeposit","label":"Security Deposit","required":false,"type":"number","step":"0.01","value":500},{"key":"depositRequired","label":"Deposit Required","required":false,"type":"tri","value":true}],"notes":[]}},{"id":"rental-units.list-units-in-a-property","svc":"property","page":"Rental Units","name":"List units in a property","method":"GET","path":"/api/v1/units/property/{{property_id}}","query":[],"params":[{"key":"property_id","label":"Property id"}],"role":"any","who":"Bearer token (the owner, or a tenant of the property)","desc":"","body":null},{"id":"rental-units.get-rental-unit-by-id","svc":"property","page":"Rental Units","name":"Get rental unit by ID","method":"GET","path":"/api/v1/units/{{unit_id}}","query":[],"params":[{"key":"unit_id","label":"Unit id"}],"role":"any","who":"Bearer token (the owner, or the tenant of the unit)","desc":"","body":null},{"id":"rental-units.update-rental-unit","svc":"property","page":"Rental Units","name":"Update rental unit","method":"PATCH","path":"/api/v1/units/{{unit_id}}","query":[],"params":[{"key":"unit_id","label":"Unit id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"unitNumber","label":"Unit Number","required":false,"value":"A101","type":"text"},{"key":"floor","label":"Floor","required":false,"value":"1","type":"text"},{"key":"rentAmount","label":"Rent Amount","required":false,"type":"number","step":"0.01","value":500},{"key":"securityDeposit","label":"Security Deposit","required":false,"type":"number","step":"0.01","value":500},{"key":"depositRequired","label":"Deposit Required","required":false,"type":"tri","value":true},{"key":"status","label":"Status","required":false,"value":"MAINTENANCE","type":"select","options":["VACANT","OCCUPIED","MAINTENANCE","RESERVED","UNAVAILABLE"]}],"notes":["status: VACANT | OCCUPIED | MAINTENANCE | RESERVED | UNAVAILABLE"]}},{"id":"rental-units.delete-rental-unit","svc":"property","page":"Rental Units","name":"Delete rental unit","method":"DELETE","path":"/api/v1/units/{{unit_id}}","query":[],"params":[{"key":"unit_id","label":"Unit id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"leases.create-lease","svc":"property","page":"Leases","name":"Create lease","method":"POST","path":"/api/v1/leases","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"Creates a lease on one rental unit (`rentalUnitId`) or on a whole property (`propertyId`). `monthlyRent` and `securityDeposit` are USD with at most 2 decimal places. The monthly rent schedule is generated from the dates.","body":{"fields":[{"key":"tenantId","label":"Tenant ID","required":true,"bind":"tenant_id","value":"","type":"text"},{"key":"rentalUnitId","label":"Rental Unit ID","required":false,"bind":"unit_id","value":"","type":"text"},{"key":"startDate","label":"Start Date","required":true,"value":"2026-11-01","type":"date"},{"key":"endDate","label":"End Date","required":true,"value":"2027-10-31","type":"date"},{"key":"monthlyRent","label":"Monthly Rent","required":true,"type":"number","step":"0.01","value":500},{"key":"securityDeposit","label":"Security Deposit","required":false,"type":"number","step":"0.01","value":500},{"key":"propertyId","label":"Property ID (whole-property lease)","type":"text","hint":"Use either a rental unit or a property, not both.","required":false,"value":""}],"notes":["Whole-property lease: send \"propertyId\": \"{{property_id}}\" instead of \"rentalUnitId\".","Amounts are USD with at most 2 decimal places."]}},{"id":"leases.list-my-leases-as-owner","svc":"property","page":"Leases","name":"List my leases as owner","method":"GET","path":"/api/v1/leases/owner","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"leases.list-all-leases-as-admin","svc":"property","page":"Leases","name":"List all leases as admin","method":"GET","path":"/api/v1/leases","query":[],"params":[],"role":"admin","who":"`{{admin_token}}`","desc":"","body":null},{"id":"leases.list-leases-of-a-tenant","svc":"property","page":"Leases","name":"List leases of a tenant","method":"GET","path":"/api/v1/leases/tenant/{{tenant_id}}","query":[],"params":[{"key":"tenant_id","label":"Tenant id"}],"role":"any","who":"Bearer token (the tenant, or an owner they rent from)","desc":"","body":null},{"id":"leases.get-lease-by-id","svc":"property","page":"Leases","name":"Get lease by ID","method":"GET","path":"/api/v1/leases/{{lease_id}}","query":[],"params":[{"key":"lease_id","label":"Lease id"}],"role":"any","who":"Bearer token (the owner, or the tenant on the lease)","desc":"","body":null},{"id":"leases.update-lease","svc":"property","page":"Leases","name":"Update lease","method":"PATCH","path":"/api/v1/leases/{{lease_id}}","query":[],"params":[{"key":"lease_id","label":"Lease id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"endDate","label":"End Date","required":false,"value":"2027-12-31","type":"date"},{"key":"status","label":"Status","required":false,"value":"ACTIVE","type":"select","options":["DRAFT","ACTIVE","RENEWED","TERMINATED","EXPIRED","EVICTED"]}],"notes":["status: DRAFT | ACTIVE | RENEWED | TERMINATED | EXPIRED | EVICTED"]}},{"id":"leases.terminate-lease","svc":"property","page":"Leases","name":"Terminate lease","method":"POST","path":"/api/v1/leases/{{lease_id}}/terminate","query":[],"params":[{"key":"lease_id","label":"Lease id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"occupancy.record-move-in-on-a-lease","svc":"property","page":"Occupancy","name":"Record move-in on a lease","method":"POST","path":"/api/v1/occupancy/move-in/lease","query":[{"key":"leaseId","value":"","bind":"lease_id"}],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"occupancy.record-direct-move-in-on-a-unit","svc":"property","page":"Occupancy","name":"Record direct move-in on a unit","method":"POST","path":"/api/v1/occupancy/move-in/direct","query":[{"key":"rentalUnitId","value":"","bind":"rental_unit_id"},{"key":"tenantId","value":"","bind":"tenant_id"}],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"occupancy.record-move-out-on-a-lease","svc":"property","page":"Occupancy","name":"Record move-out on a lease","method":"POST","path":"/api/v1/occupancy/move-out/lease","query":[{"key":"leaseId","value":"","bind":"lease_id"}],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"occupancy.record-direct-move-out-from-a-unit","svc":"property","page":"Occupancy","name":"Record direct move-out from a unit","method":"POST","path":"/api/v1/occupancy/move-out/direct","query":[{"key":"rentalUnitId","value":"","bind":"rental_unit_id"},{"key":"tenantId","value":"","bind":"tenant_id"}],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"occupancy.get-current-occupancy-of-a-unit","svc":"property","page":"Occupancy","name":"Get current occupancy of a unit","method":"GET","path":"/api/v1/occupancy/unit/{{unit_id}}/current","query":[],"params":[{"key":"unit_id","label":"Unit id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"occupancy.list-occupancy-history-of-a-unit","svc":"property","page":"Occupancy","name":"List occupancy history of a unit","method":"GET","path":"/api/v1/occupancy/unit/{{unit_id}}","query":[],"params":[{"key":"unit_id","label":"Unit id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"occupancy.get-current-occupancy-of-a-property","svc":"property","page":"Occupancy","name":"Get current occupancy of a property","method":"GET","path":"/api/v1/occupancy/property/{{property_id}}/current","query":[],"params":[{"key":"property_id","label":"Property id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"occupancy.list-occupancy-history-of-a-property","svc":"property","page":"Occupancy","name":"List occupancy history of a property","method":"GET","path":"/api/v1/occupancy/property/{{property_id}}","query":[],"params":[{"key":"property_id","label":"Property id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"occupancy.list-occupancy-history-of-a-tenant","svc":"property","page":"Occupancy","name":"List occupancy history of a tenant","method":"GET","path":"/api/v1/occupancy/tenant/{{tenant_id}}","query":[],"params":[{"key":"tenant_id","label":"Tenant id"}],"role":"any","who":"Bearer token (the tenant, or an owner they rent from)","desc":"","body":null},{"id":"rent-payments.get-rent-due-on-a-lease","svc":"property","page":"Rent Payments","name":"Get rent due on a lease","method":"GET","path":"/api/v1/rent/due/{{lease_id}}","query":[],"params":[{"key":"lease_id","label":"Lease id"}],"role":"any","who":"Bearer token (the owner, or the tenant on the lease)","desc":"","body":null},{"id":"rent-payments.pay-rent-on-a-lease","svc":"property","page":"Rent Payments","name":"Pay rent on a lease","method":"POST","path":"/api/v1/rent/pay","query":[],"params":[],"role":"any","who":"Bearer token (the tenant)","desc":"Pays rent on a lease from the tenant's wallet. The service makes one transfer to the owner's wallet and books the payment only after that transfer succeeds. If the lease needs a security deposit that is not held yet, part of the payment goes to the deposit first (see `depositAmountApplied` in the response).\n\n`paymentMethod` accepts only `WALLET` (or leave it out). `amount` is USD, positive, at most 2 decimal places.\n\n**`reference`** makes the payment retry safe. Reuse the same value to retry a payment that failed or timed out and it is never charged twice. The folder's pre-request script fills `payment_reference` with a new value when it is empty, and the test script clears it after a successful payment so the next payment gets a new one.\n\n**503** means nothing was charged (`SERVICE_OFFLINE`, auth or wallet service down) or the outcome could not be confirmed. In both cases send the request again with the same `reference`.","body":{"fields":[{"key":"leaseId","label":"Lease ID","required":true,"bind":"lease_id","value":"","type":"text"},{"key":"amount","label":"Amount","required":true,"type":"number","step":"0.01","value":500},{"key":"paymentMethod","label":"Payment Method","required":false,"value":"WALLET","type":"select","options":["WALLET"]},{"key":"reference","label":"Reference","required":false,"bind":"payment_reference","value":"","type":"text"}],"notes":[]}},{"id":"rent-payments.list-rent-payments-on-a-lease","svc":"property","page":"Rent Payments","name":"List rent payments on a lease","method":"GET","path":"/api/v1/rent/history/{{lease_id}}","query":[],"params":[{"key":"lease_id","label":"Lease id"}],"role":"any","who":"Bearer token (the owner, or the tenant on the lease)","desc":"","body":null},{"id":"rent-payments.list-upcoming-rent-payments-on-a-lease","svc":"property","page":"Rent Payments","name":"List upcoming rent payments on a lease","method":"GET","path":"/api/v1/rent-schedules/lease/{{lease_id}}","query":[],"params":[{"key":"lease_id","label":"Lease id"}],"role":"any","who":"Bearer token (the owner, or the tenant on the lease)","desc":"","body":null},{"id":"rent-payments.get-arrears-or-credit-on-a-lease","svc":"property","page":"Rent Payments","name":"Get arrears or credit on a lease","method":"GET","path":"/api/v1/rent/balance/lease/{{lease_id}}","query":[],"params":[{"key":"lease_id","label":"Lease id"}],"role":"any","who":"Bearer token (the owner, or the tenant on the lease)","desc":"","body":null},{"id":"rent-payments.get-my-rent-due-on-a-unit","svc":"property","page":"Rent Payments","name":"Get my rent due on a unit","method":"GET","path":"/api/v1/rent/units/due/{{rental_unit_id}}","query":[],"params":[{"key":"rental_unit_id","label":"Rental unit id"}],"role":"any","who":"Bearer token (the tenant of the unit)","desc":"","body":null},{"id":"rent-payments.get-rent-due-on-a-unit-for-a-tenant","svc":"property","page":"Rent Payments","name":"Get rent due on a unit for a tenant","method":"GET","path":"/api/v1/rent/units/due/{{rental_unit_id}}/tenant/{{tenant_id}}","query":[],"params":[{"key":"rental_unit_id","label":"Rental unit id"},{"key":"tenant_id","label":"Tenant id"}],"role":"any","who":"Bearer token (the tenant, or the owner)","desc":"","body":null},{"id":"rent-payments.pay-rent-on-a-unit","svc":"property","page":"Rent Payments","name":"Pay rent on a unit","method":"POST","path":"/api/v1/rent/units/pay","query":[],"params":[],"role":"any","who":"Bearer token (the tenant)","desc":"Pays rent on a directly occupied unit (no lease) from the tenant's wallet. The response carries `resultingBalance`: positive means arrears remain, negative means the tenant is in credit. `reference` and the 503 behaviour work as in **Pay rent on a lease**.","body":{"fields":[{"key":"rentalUnitId","label":"Rental Unit ID","required":true,"bind":"rental_unit_id","value":"","type":"text"},{"key":"amount","label":"Amount","required":true,"type":"number","step":"0.01","value":200},{"key":"paymentMethod","label":"Payment Method","required":false,"value":"WALLET","type":"select","options":["WALLET"]},{"key":"reference","label":"Reference","required":false,"bind":"payment_reference","value":"","type":"text"}],"notes":[]}},{"id":"rent-payments.list-rent-payments-on-a-unit","svc":"property","page":"Rent Payments","name":"List rent payments on a unit","method":"GET","path":"/api/v1/rent/units/history/{{rental_unit_id}}","query":[],"params":[{"key":"rental_unit_id","label":"Rental unit id"}],"role":"any","who":"Bearer token (the owner, or the tenant of the unit)","desc":"","body":null},{"id":"rent-payments.get-my-arrears-or-credit-on-a-unit","svc":"property","page":"Rent Payments","name":"Get my arrears or credit on a unit","method":"GET","path":"/api/v1/rent/balance/unit/{{rental_unit_id}}/me","query":[],"params":[{"key":"rental_unit_id","label":"Rental unit id"}],"role":"any","who":"Bearer token (the tenant)","desc":"","body":null},{"id":"rent-payments.get-my-full-rent-statement","svc":"property","page":"Rent Payments","name":"Get my full rent statement","method":"GET","path":"/api/v1/rent/balance/me","query":[],"params":[],"role":"any","who":"Bearer token (the tenant)","desc":"","body":null},{"id":"security-deposits.hold-deposit","svc":"property","page":"Security Deposits","name":"Hold deposit","method":"POST","path":"/api/v1/security-deposits","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"Books a security deposit without moving any money. Deposits taken as part of a rent payment (**Pay rent on a lease**) are the ones settled through the wallet.","body":{"fields":[{"key":"leaseId","label":"Lease ID","type":"text","hint":"Give a lease, or a rental unit and tenant.","required":false,"value":""},{"key":"rentalUnitId","label":"Rental Unit ID","required":false,"bind":"rental_unit_id","value":"","type":"text"},{"key":"tenantId","label":"Tenant ID","required":false,"bind":"tenant_id","value":"","type":"text"},{"key":"amount","label":"Amount","required":true,"type":"number","step":"0.01","value":500}],"notes":["For a lease, send \"leaseId\": \"{{lease_id}}\" and \"amount\" instead of rentalUnitId and tenantId."]}},{"id":"security-deposits.get-deposit-on-a-lease","svc":"property","page":"Security Deposits","name":"Get deposit on a lease","method":"GET","path":"/api/v1/security-deposits/lease/{{lease_id}}","query":[],"params":[{"key":"lease_id","label":"Lease id"}],"role":"any","who":"Bearer token (the owner, or the tenant on the lease)","desc":"","body":null},{"id":"security-deposits.get-deposit-on-a-unit-for-a-tenant","svc":"property","page":"Security Deposits","name":"Get deposit on a unit for a tenant","method":"GET","path":"/api/v1/security-deposits/unit/{{rental_unit_id}}/tenant/{{tenant_id}}","query":[],"params":[{"key":"rental_unit_id","label":"Rental unit id"},{"key":"tenant_id","label":"Tenant id"}],"role":"any","who":"Bearer token (the tenant, or the owner)","desc":"","body":null},{"id":"security-deposits.get-my-deposit-on-a-unit","svc":"property","page":"Security Deposits","name":"Get my deposit on a unit","method":"GET","path":"/api/v1/security-deposits/unit/{{rental_unit_id}}/me","query":[],"params":[{"key":"rental_unit_id","label":"Rental unit id"}],"role":"any","who":"Bearer token (the tenant)","desc":"","body":null},{"id":"security-deposits.check-refund-on-a-lease","svc":"property","page":"Security Deposits","name":"Check refund on a lease","method":"GET","path":"/api/v1/security-deposits/lease/{{lease_id}}/refund-check","query":[{"key":"amount","value":"500","type":"number"}],"params":[{"key":"lease_id","label":"Lease id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"security-deposits.check-refund-on-a-unit","svc":"property","page":"Security Deposits","name":"Check refund on a unit","method":"GET","path":"/api/v1/security-deposits/unit/{{rental_unit_id}}/tenant/{{tenant_id}}/refund-check","query":[{"key":"amount","value":"500","type":"number"}],"params":[{"key":"rental_unit_id","label":"Rental unit id"},{"key":"tenant_id","label":"Tenant id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"security-deposits.refund-deposit","svc":"property","page":"Security Deposits","name":"Refund deposit","method":"POST","path":"/api/v1/security-deposits/refund","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"Records a refund against the held deposit. A partial refund needs a `reason`, and a final refund closes the deposit. The refund is recorded in this service and does not yet move money out of the owner's wallet. Use **Check refund on a lease** or **Check refund on a unit** first to preview the result.","body":{"fields":[{"key":"leaseId","label":"Lease ID","type":"text","hint":"Give a lease, or a rental unit and tenant.","required":false,"value":""},{"key":"rentalUnitId","label":"Rental Unit ID","required":false,"bind":"rental_unit_id","value":"","type":"text"},{"key":"tenantId","label":"Tenant ID","required":false,"bind":"tenant_id","value":"","type":"text"},{"key":"amount","label":"Amount","required":true,"type":"number","step":"0.01","value":500},{"key":"reason","label":"Reason","required":false,"value":"Move-out, no damages","type":"text"}],"notes":["For a lease, send \"leaseId\": \"{{lease_id}}\", \"amount\" and \"reason\" instead of rentalUnitId and tenantId."]}},{"id":"meter-readings.record-meter-reading","svc":"property","page":"Meter Readings","name":"Record meter reading","method":"POST","path":"/api/v1/meter-readings","query":[],"params":[],"role":"any","who":"Bearer token (the owner, or the tenant of the unit)","desc":"","body":{"fields":[{"key":"rentalUnitId","label":"Rental Unit ID","required":true,"bind":"unit_id","value":"","type":"text"},{"key":"meterType","label":"Meter Type","required":true,"value":"ELECTRICITY","type":"select","options":["ELECTRICITY","WATER"]},{"key":"currentReading","label":"Current Reading","required":true,"type":"number","step":"any","value":50}],"notes":["meterType: ELECTRICITY | WATER. currentReading is a number (up to 3 decimal places) and cannot be negative."]}},{"id":"meter-readings.get-meter-reading-by-id","svc":"property","page":"Meter Readings","name":"Get meter reading by ID","method":"GET","path":"/api/v1/meter-readings/{{meter_reading_id}}","query":[],"params":[{"key":"meter_reading_id","label":"Meter reading id"}],"role":"any","who":"Bearer token (the owner, or the tenant of the unit)","desc":"","body":null},{"id":"meter-readings.list-meter-readings-of-a-unit","svc":"property","page":"Meter Readings","name":"List meter readings of a unit","method":"GET","path":"/api/v1/meter-readings/unit/{{unit_id}}","query":[],"params":[{"key":"unit_id","label":"Unit id"}],"role":"any","who":"Bearer token (the owner, or the tenant of the unit)","desc":"","body":null},{"id":"utility-bills.generate-bill-from-meter-reading","svc":"property","page":"Utility Bills","name":"Generate bill from meter reading","method":"POST","path":"/api/v1/utility-bills/from-reading","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"Creates a bill from a meter reading: consumption times the rate, rounded to the cent. A reading that gives a zero bill is rejected, and a reading that already has a bill cannot be billed twice.","body":{"fields":[{"key":"meterReadingId","label":"Meter Reading ID","required":true,"bind":"meter_reading_id","value":"","type":"text"},{"key":"ratePerUnit","label":"Rate per unit (USD)","type":"number","step":"0.000001","hint":"Leave blank to use the configured rate for the meter type.","required":false,"value":""}],"notes":["Optional: \"ratePerUnit\": 0.15 (USD per unit). Leave it out to use the configured rate for that meter type."]}},{"id":"utility-bills.generate-bill-with-a-flat-amount","svc":"property","page":"Utility Bills","name":"Generate bill with a flat amount","method":"POST","path":"/api/v1/utility-bills","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"Creates a utility bill with a fixed USD amount. Use **Generate bill from meter reading** to price consumption instead.","body":{"fields":[{"key":"rentalUnitId","label":"Rental Unit ID","required":true,"bind":"unit_id","value":"","type":"text"},{"key":"utilityType","label":"Utility Type","required":true,"value":"WATER","type":"select","options":["ELECTRICITY","WATER","GAS","INTERNET","GARBAGE","OTHER"]},{"key":"amount","label":"Amount","required":true,"type":"number","step":"0.01","value":30},{"key":"billingPeriodStart","label":"Billing Period Start","required":false,"value":"2026-09-01T00:00:00","type":"datetime"},{"key":"billingPeriodEnd","label":"Billing Period End","required":false,"value":"2026-09-30T23:59:59","type":"datetime"}],"notes":["utilityType: ELECTRICITY | WATER | GAS | INTERNET | GARBAGE | OTHER. amount is USD with at most 2 decimal places."]}},{"id":"utility-bills.list-bills-of-a-unit","svc":"property","page":"Utility Bills","name":"List bills of a unit","method":"GET","path":"/api/v1/utility-bills/unit/{{unit_id}}","query":[],"params":[{"key":"unit_id","label":"Unit id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"utility-bills.list-bills-of-a-tenant","svc":"property","page":"Utility Bills","name":"List bills of a tenant","method":"GET","path":"/api/v1/utility-bills/tenant/{{tenant_id}}","query":[],"params":[{"key":"tenant_id","label":"Tenant id"}],"role":"any","who":"Bearer token (the tenant, or an owner they rent from)","desc":"","body":null},{"id":"utility-bills.list-outstanding-bills-of-a-tenant","svc":"property","page":"Utility Bills","name":"List outstanding bills of a tenant","method":"GET","path":"/api/v1/utility-bills/tenant/{{tenant_id}}/outstanding","query":[],"params":[{"key":"tenant_id","label":"Tenant id"}],"role":"any","who":"Bearer token (the tenant, or an owner they rent from)","desc":"","body":null},{"id":"utility-bills.get-bill-by-id","svc":"property","page":"Utility Bills","name":"Get bill by ID","method":"GET","path":"/api/v1/utility-bills/{{bill_id}}","query":[],"params":[{"key":"bill_id","label":"Bill id"}],"role":"any","who":"Bearer token (the tenant it was billed to, or the owner)","desc":"","body":null},{"id":"utility-bills.pay-utility-bill","svc":"property","page":"Utility Bills","name":"Pay utility bill","method":"POST","path":"/api/v1/utility-bills/pay","query":[],"params":[],"role":"any","who":"Bearer token (the tenant)","desc":"Pays a utility bill from the tenant's wallet. `amount` is USD with at most 2 decimal places. `reference` and the 503 behaviour work as in **Pay rent on a lease**.","body":{"fields":[{"key":"billId","label":"Bill ID","required":true,"bind":"bill_id","value":"","type":"text"},{"key":"amount","label":"Amount","required":true,"type":"number","step":"0.01","value":30},{"key":"paymentMethod","label":"Payment Method","required":false,"value":"WALLET","type":"select","options":["WALLET"]},{"key":"reference","label":"Reference","required":false,"bind":"payment_reference","value":"","type":"text"}],"notes":[]}},{"id":"maintenance.create-maintenance-request","svc":"property","page":"Maintenance","name":"Create maintenance request","method":"POST","path":"/api/v1/maintenance","query":[],"params":[],"role":"any","who":"Bearer token (the tenant of the unit, or the owner)","desc":"","body":{"fields":[{"key":"rentalUnitId","label":"Rental Unit ID","required":true,"bind":"unit_id","value":"","type":"text"},{"key":"title","label":"Title","required":true,"value":"Broken windows","type":"text"},{"key":"description","label":"Description","required":false,"value":"Living room window won't close","type":"textarea"}],"notes":[]}},{"id":"maintenance.get-maintenance-request-by-id","svc":"property","page":"Maintenance","name":"Get maintenance request by ID","method":"GET","path":"/api/v1/maintenance/{{maintenance_id}}","query":[],"params":[{"key":"maintenance_id","label":"Maintenance id"}],"role":"any","who":"Bearer token (the owner, or the tenant concerned)","desc":"","body":null},{"id":"maintenance.list-maintenance-requests-of-a-tenant","svc":"property","page":"Maintenance","name":"List maintenance requests of a tenant","method":"GET","path":"/api/v1/maintenance/tenant/{{tenant_id}}","query":[],"params":[{"key":"tenant_id","label":"Tenant id"}],"role":"any","who":"Bearer token (the tenant, or an owner they rent from)","desc":"","body":null},{"id":"maintenance.list-maintenance-requests-of-a-unit","svc":"property","page":"Maintenance","name":"List maintenance requests of a unit","method":"GET","path":"/api/v1/maintenance/unit/{{unit_id}}","query":[],"params":[{"key":"unit_id","label":"Unit id"}],"role":"any","who":"Bearer token (the owner, or the tenant of the unit)","desc":"","body":null},{"id":"maintenance.list-maintenance-requests-by-status","svc":"property","page":"Maintenance","name":"List maintenance requests by status","method":"GET","path":"/api/v1/maintenance","query":[{"key":"status","value":"PENDING","options":["PENDING","IN_PROGRESS","COMPLETED","CANCELLED"]}],"params":[],"role":"any","who":"Bearer token (an owner sees their own units, an admin sees all)","desc":"","body":null},{"id":"maintenance.update-maintenance-request-status","svc":"property","page":"Maintenance","name":"Update maintenance request status","method":"PATCH","path":"/api/v1/maintenance/{{maintenance_id}}/status","query":[],"params":[{"key":"maintenance_id","label":"Maintenance id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"status","label":"Status","required":true,"value":"IN_PROGRESS","type":"select","options":["PENDING","IN_PROGRESS","COMPLETED","CANCELLED"]}],"notes":["status: PENDING | IN_PROGRESS | COMPLETED | CANCELLED"]}},{"id":"work-orders.create-work-order","svc":"property","page":"Work Orders","name":"Create work order","method":"POST","path":"/api/v1/work-orders","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"maintenanceRequestId","label":"Maintenance Request ID","required":true,"bind":"maintenance_request_id","value":"","type":"text"},{"key":"assignedTo","label":"Assigned To","required":true,"bind":"technician_id","value":"","type":"text"},{"key":"title","label":"Title","required":true,"value":"Fix leaking pipe","type":"text"},{"key":"description","label":"Description","required":false,"value":"Kitchen sink pipe leaking under cabinet","type":"textarea"}],"notes":[]}},{"id":"work-orders.get-work-order-by-id","svc":"property","page":"Work Orders","name":"Get work order by ID","method":"GET","path":"/api/v1/work-orders/{{work_order_id}}","query":[],"params":[{"key":"work_order_id","label":"Work order id"}],"role":"any","who":"Bearer token (the owner, the technician, or the tenant who raised the request)","desc":"","body":null},{"id":"work-orders.list-work-orders-of-a-maintenance-request","svc":"property","page":"Work Orders","name":"List work orders of a maintenance request","method":"GET","path":"/api/v1/work-orders/maintenance/{{maintenance_request_id}}","query":[],"params":[{"key":"maintenance_request_id","label":"Maintenance request id"}],"role":"any","who":"Bearer token (the owner, or the tenant who raised it)","desc":"","body":null},{"id":"work-orders.list-work-orders-of-an-assignee","svc":"property","page":"Work Orders","name":"List work orders of an assignee","method":"GET","path":"/api/v1/work-orders/assignee/{{assigned_to_id}}","query":[],"params":[{"key":"assigned_to_id","label":"Assigned to id"}],"role":"any","who":"Bearer token (that technician, or an admin)","desc":"","body":null},{"id":"work-orders.list-work-orders-by-status","svc":"property","page":"Work Orders","name":"List work orders by status","method":"GET","path":"/api/v1/work-orders","query":[{"key":"status","value":"ASSIGNED","options":["ASSIGNED","IN_PROGRESS","COMPLETED","CANCELLED"]}],"params":[],"role":"any","who":"Bearer token (an owner sees their own, an admin sees all)","desc":"","body":null},{"id":"work-orders.update-work-order-status","svc":"property","page":"Work Orders","name":"Update work order status","method":"PATCH","path":"/api/v1/work-orders/{{work_order_id}}/status","query":[],"params":[{"key":"work_order_id","label":"Work order id"}],"role":"any","who":"Bearer token (the assigned technician, or the owner)","desc":"","body":{"fields":[{"key":"status","label":"Status","required":true,"value":"IN_PROGRESS","type":"select","options":["ASSIGNED","IN_PROGRESS","COMPLETED","CANCELLED"]}],"notes":["status: ASSIGNED | IN_PROGRESS | COMPLETED | CANCELLED"]}},{"id":"inspections.create-inspection","svc":"property","page":"Inspections","name":"Create inspection","method":"POST","path":"/api/v1/inspections","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"rentalUnitId","label":"Rental Unit ID","required":true,"bind":"unit_id","value":"","type":"text"},{"key":"title","label":"Title","required":true,"value":"Move-in Inspection","type":"text"},{"key":"scheduledDate","label":"Scheduled Date","required":true,"value":"2026-11-15","type":"date"},{"key":"inspectorFullName","label":"Inspector Full Name","required":false,"value":"John Kamau","type":"text"},{"key":"inspectorPhoneNumber","label":"Inspector Phone Number","required":false,"value":"+254733123456","type":"text"},{"key":"inspectorIdNumber","label":"Inspector ID Number","required":false,"value":"29384756","type":"text"},{"key":"inspectorEmail","label":"Inspector Email","required":false,"value":"john.kamau@example.com","type":"text"}],"notes":[]}},{"id":"inspections.get-inspection-by-id","svc":"property","page":"Inspections","name":"Get inspection by ID","method":"GET","path":"/api/v1/inspections/{{inspection_id}}","query":[],"params":[{"key":"inspection_id","label":"Inspection id"}],"role":"any","who":"Bearer token (the owner, or whoever scheduled or was assigned it)","desc":"","body":null},{"id":"inspections.list-inspections-of-a-unit","svc":"property","page":"Inspections","name":"List inspections of a unit","method":"GET","path":"/api/v1/inspections/unit/{{unit_id}}","query":[],"params":[{"key":"unit_id","label":"Unit id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"inspections.list-inspections-of-an-inspector","svc":"property","page":"Inspections","name":"List inspections of an inspector","method":"GET","path":"/api/v1/inspections/inspector/{{inspector_user_id}}","query":[],"params":[{"key":"inspector_user_id","label":"Inspector user id"}],"role":"any","who":"Bearer token (that inspector, or an admin)","desc":"","body":null},{"id":"inspections.list-inspections-created-by-a-user","svc":"property","page":"Inspections","name":"List inspections created by a user","method":"GET","path":"/api/v1/inspections/created-by/{{user_id}}","query":[],"params":[{"key":"user_id","label":"User id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"inspections.list-my-inspections-by-status","svc":"property","page":"Inspections","name":"List my inspections by status","method":"GET","path":"/api/v1/inspections/me","query":[{"key":"status","value":"COMPLETED","options":["SCHEDULED","COMPLETED","CANCELLED"]}],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"inspections.complete-inspection","svc":"property","page":"Inspections","name":"Complete inspection","method":"POST","path":"/api/v1/inspections/{{inspection_id}}/complete","query":[],"params":[{"key":"inspection_id","label":"Inspection id"}],"role":"any","who":"Bearer token (whoever scheduled or was assigned the inspection)","desc":"","body":{"fields":[{"key":"findings","label":"Findings","required":true,"value":"All fixtures in good condition","type":"textarea"},{"key":"recommendations","label":"Recommendations","required":false,"value":"None","type":"textarea"}],"notes":[]}},{"id":"inspections.cancel-inspection","svc":"property","page":"Inspections","name":"Cancel inspection","method":"POST","path":"/api/v1/inspections/{{inspection_id}}/cancel","query":[],"params":[{"key":"inspection_id","label":"Inspection id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"notices.send-notice-to-a-unit","svc":"property","page":"Notices","name":"Send notice to a unit","method":"POST","path":"/api/v1/notices/unit","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"rentalUnitId","label":"Rental Unit ID","required":true,"bind":"unit_id","value":"","type":"text"},{"key":"noticeType","label":"Notice Type","required":true,"value":"GENERAL","type":"select","options":["RENT_REMINDER","LEASE_RENEWAL","EVICTION","MOVE_OUT","MAINTENANCE","GENERAL"]},{"key":"title","label":"Title","required":true,"value":"Water shutoff notice","type":"text"},{"key":"content","label":"Content","required":true,"value":"Water will be shut off for maintenance on Friday from 9am to 2pm.","type":"textarea"},{"key":"tenantId","label":"Tenant ID","type":"text","hint":"Leave blank to use the current occupant of the unit.","required":false,"value":""}],"notes":["tenantId is optional: leave it out and the current occupant of the unit is used.","noticeType: RENT_REMINDER | LEASE_RENEWAL | EVICTION | MOVE_OUT | MAINTENANCE | GENERAL"]}},{"id":"notices.send-notice-to-a-lease","svc":"property","page":"Notices","name":"Send notice to a lease","method":"POST","path":"/api/v1/notices/lease","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":{"fields":[{"key":"leaseId","label":"Lease ID","required":true,"bind":"lease_id","value":"","type":"text"},{"key":"noticeType","label":"Notice Type","required":true,"value":"RENT_REMINDER","type":"select","options":["RENT_REMINDER","LEASE_RENEWAL","EVICTION","MOVE_OUT","MAINTENANCE","GENERAL"]},{"key":"title","label":"Title","required":true,"value":"Rent due reminder","type":"text"},{"key":"content","label":"Content","required":true,"value":"Your rent payment is due in 3 days.","type":"textarea"}],"notes":[]}},{"id":"notices.send-or-schedule-bulk-notice","svc":"property","page":"Notices","name":"Send or schedule bulk notice","method":"POST","path":"/api/v1/notices/bulk","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"Sends one notice to many units or leases, now or at a future time. The response lists the result for each recipient.","body":{"fields":[{"key":"leaseIds","label":"Lease IDs","required":false,"type":"list","bind":"lease_id"},{"key":"noticeType","label":"Notice Type","required":true,"value":"LEASE_RENEWAL","type":"select","options":["RENT_REMINDER","LEASE_RENEWAL","EVICTION","MOVE_OUT","MAINTENANCE","GENERAL"]},{"key":"title","label":"Title","required":true,"value":"Lease renewal reminder","type":"text"},{"key":"content","label":"Content","required":true,"value":"Dear Tenant,\n\nYour lease agreement is set to expire on 31 October 2027. If you wish to renew, please contact the property management office before 15 October 2027.\n\nThank you.","type":"textarea"},{"key":"channels","label":"Channels","required":true,"type":"multi","options":["EMAIL"],"value":["EMAIL"]},{"key":"rentalUnitIds","label":"Rental unit IDs","type":"list","hint":"One per line or comma separated. Give unit IDs, lease IDs, or both.","required":false,"value":""},{"key":"scheduledAt","label":"Send at","type":"datetime","hint":"Leave blank to send now. A future time queues the notice.","required":false,"value":""}],"notes":["Give at least one of rentalUnitIds or leaseIds (both may be used together).","Leave scheduledAt out (or send a past time) to send now. A future time, for example \"scheduledAt\": \"2026-12-01T09:00:00\", queues the notice.","EMAIL is the only delivery channel. Asking for SMS returns 400."]}},{"id":"notices.list-my-bulk-notices","svc":"property","page":"Notices","name":"List my bulk notices","method":"GET","path":"/api/v1/notices/bulk/mine","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"notices.get-bulk-notice-by-id","svc":"property","page":"Notices","name":"Get bulk notice by ID","method":"GET","path":"/api/v1/notices/bulk/{{scheduled_notice_id}}","query":[],"params":[{"key":"scheduled_notice_id","label":"Scheduled notice id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"notices.cancel-bulk-notice","svc":"property","page":"Notices","name":"Cancel bulk notice","method":"POST","path":"/api/v1/notices/bulk/{{scheduled_notice_id}}/cancel","query":[],"params":[{"key":"scheduled_notice_id","label":"Scheduled notice id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"No body. Only works while status is `PENDING`.","body":null},{"id":"notices.get-notice-by-id","svc":"property","page":"Notices","name":"Get notice by ID","method":"GET","path":"/api/v1/notices/{{notice_id}}","query":[],"params":[{"key":"notice_id","label":"Notice id"}],"role":"any","who":"Bearer token (the owner, or the tenant concerned)","desc":"","body":null},{"id":"notices.list-notices-of-a-tenant","svc":"property","page":"Notices","name":"List notices of a tenant","method":"GET","path":"/api/v1/notices/tenant/{{tenant_id}}","query":[],"params":[{"key":"tenant_id","label":"Tenant id"}],"role":"any","who":"Bearer token (the tenant, or an owner they rent from)","desc":"","body":null},{"id":"notices.list-notices-of-a-lease","svc":"property","page":"Notices","name":"List notices of a lease","method":"GET","path":"/api/v1/notices/lease/{{lease_id}}","query":[],"params":[{"key":"lease_id","label":"Lease id"}],"role":"any","who":"Bearer token (the owner, or the tenant on the lease)","desc":"","body":null},{"id":"notices.list-notices-of-a-tenant-by-type","svc":"property","page":"Notices","name":"List notices of a tenant by type","method":"GET","path":"/api/v1/notices/tenant/{{tenant_id}}/type/{{notice_type}}","query":[],"params":[{"key":"tenant_id","label":"Tenant id"},{"key":"notice_type","label":"Notice type","options":["RENT_REMINDER","LEASE_RENEWAL","EVICTION","MOVE_OUT","MAINTENANCE","GENERAL"]}],"role":"any","who":"Bearer token (the tenant, or an owner they rent from)","desc":"RENT_REMINDER,\n\nLEASE_RENEWAL,\n\nEVICTION,\n\nMOVE_OUT,\n\nMAINTENANCE,\n\nGENERAL","body":null},{"id":"blacklisted-tenants.add-tenant-to-blacklist","svc":"property","page":"Blacklisted Tenants","name":"Add tenant to blacklist","method":"POST","path":"/api/v1/blacklisted-tenants","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"Any registered owner can add a tenant. Only the owner who added an entry (or an admin) can remove it, and **List blacklisted tenants** lists only the caller's own entries (an admin sees all).","body":{"fields":[{"key":"tenantId","label":"Tenant ID","required":true,"bind":"tenant_id","value":"","type":"text"},{"key":"reason","label":"Reason","required":true,"value":"Unpaid rent for 3 months","type":"text"},{"key":"notes","label":"Notes","required":false,"value":"Left property without notice","type":"textarea"}],"notes":[]}},{"id":"blacklisted-tenants.list-blacklisted-tenants","svc":"property","page":"Blacklisted Tenants","name":"List blacklisted tenants","method":"GET","path":"/api/v1/blacklisted-tenants","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"blacklisted-tenants.get-blacklist-entry-of-a-tenant","svc":"property","page":"Blacklisted Tenants","name":"Get blacklist entry of a tenant","method":"GET","path":"/api/v1/blacklisted-tenants/{{tenant_id}}","query":[],"params":[{"key":"tenant_id","label":"Tenant id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"blacklisted-tenants.remove-tenant-from-blacklist","svc":"property","page":"Blacklisted Tenants","name":"Remove tenant from blacklist","method":"DELETE","path":"/api/v1/blacklisted-tenants/{{tenant_id}}","query":[],"params":[{"key":"tenant_id","label":"Tenant id"}],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"dashboard-and-reports.get-owner-dashboard","svc":"property","page":"Dashboard and reports","name":"Get owner dashboard","method":"GET","path":"/api/v1/dashboard/owner","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"dashboard-and-reports.get-occupancy-report","svc":"property","page":"Dashboard and reports","name":"Get occupancy report","method":"GET","path":"/api/v1/reports/owner/occupancy","query":[],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"dashboard-and-reports.get-revenue-report","svc":"property","page":"Dashboard and reports","name":"Get revenue report","method":"GET","path":"/api/v1/reports/owner/revenue","query":[{"key":"start","value":"2026-01-01","type":"date"},{"key":"end","value":"2026-12-31","type":"date"}],"params":[],"role":"owner","who":"`{{home_owner_token}}`","desc":"","body":null},{"id":"system.check-health","svc":"property","page":"System","name":"Check health","method":"GET","path":"/system/health","query":[],"params":[],"role":"public","who":"None","desc":"Public. Returns status only, for load balancers and the other services' probes.","body":null},{"id":"system.get-health-details","svc":"property","page":"System","name":"Get health details","method":"GET","path":"/system/health/details","query":[],"params":[],"role":"admin","who":"`{{admin_token}}`","desc":"Admin only (`{{admin_token}}`). Returns service details such as the Java version and database.","body":null},{"id":"system.check-dependency-status","svc":"property","page":"System","name":"Check dependency status","method":"GET","path":"/system/dependencies","query":[],"params":[],"role":"any","who":"Bearer token (any signed-in user)","desc":"Live status of the authentication service and the wallet service (`UP`, `DEGRADED` or `DOWN`). A frontend can poll it to disable a Pay button before the tenant taps it.","body":null},{"id":"system.check-token","svc":"property","page":"System","name":"Check token","method":"GET","path":"/system/test-token","query":[],"params":[],"role":"any","who":"Bearer token (only when SYSTEM_TEST_TOKEN_ENABLED is true)","desc":"Decodes the Bearer token and shows its claims. It is switched off by default: the service answers **404** unless `SYSTEM_TEST_TOKEN_ENABLED=true`. Leave it off outside development.","body":null}],"pages":[{"name":"Owners","slug":"owners","note":"The owner profile is read and changed with `{{home_owner_token}}`. **Create owner profile from my account** and **Create owner profile** save `owner_id`."},{"name":"Tenants","slug":"tenants","note":"Tenant requests use `{{token}}`. **Create tenant profile from my account** and **Create tenant profile** save `tenant_id`."},{"name":"Properties","slug":"properties","note":"Owner requests use `{{home_owner_token}}`. An owner reaches only their own properties."},{"name":"Rental Units","slug":"rental-units","note":"Creating, updating and deleting units needs the property's owner. `rentAmount` and `securityDeposit` are USD. **Create rental unit** saves `unit_id` and `rental_unit_id`."},{"name":"Leases","slug":"leases","note":"`monthlyRent` and `securityDeposit` are USD. **List my leases as owner** returns the owner's leases, and **List all leases as admin** sends `{{admin_token}}`."},{"name":"Occupancy","slug":"occupancy","note":"Move-in and move-out records, by lease or directly on a unit, plus history views for owners."},{"name":"Rent Payments","slug":"rent-payments","note":"Payments are USD and settled from the tenant's wallet, so fund the wallet in the Wallet Service first. Keep `payment_reference` to retry a payment safely. Lease requests come first, then directly occupied units, then the tenant's own statement."},{"name":"Security Deposits","slug":"security-deposits","note":"Amounts are USD. The owner holds and refunds deposits and previews refunds."},{"name":"Meter Readings","slug":"meter-readings","note":"A reading can be recorded by the owner or the tenant of the unit."},{"name":"Utility Bills","slug":"utility-bills","note":"Amounts are USD. Owners generate bills and tenants pay them from the wallet."},{"name":"Maintenance","slug":"maintenance","note":"A tenant raises a request with the normal token. **Update maintenance request status** is for the owner."},{"name":"Work Orders","slug":"work-orders","note":"Created by the owner from a maintenance request and updated by the assigned technician or the owner."},{"name":"Inspections","slug":"inspections","note":"The owner schedules and cancels. Whoever scheduled or was assigned an inspection completes it."},{"name":"Notices","slug":"notices","note":"Single and bulk notices are sent by the owner. EMAIL is the only delivery channel."},{"name":"Blacklisted Tenants","slug":"blacklisted-tenants","note":"Owner requests. Entries are scoped to the owner who created them (an admin sees all)."},{"name":"Dashboard and reports","slug":"dashboard-and-reports","note":"Owner requests (`{{home_owner_token}}`). They cover the owner's own properties."},{"name":"System","slug":"system","note":"Health and dependency checks. **Get health details** needs an admin token. **Check token** is off unless the service sets `SYSTEM_TEST_TOKEN_ENABLED=true`."}]};
+/* ---------- core: helpers, state, api ---------- */
+'use strict';
+const $ = (s, r) => (r || document).querySelector(s);
+const SYNC = { unit_id: 'rental_unit_id', rental_unit_id: 'unit_id', maintenance_id: 'maintenance_request_id', maintenance_request_id: 'maintenance_id' };
+const USERISH = ['user_id', 'assigned_to_id', 'inspector_user_id', 'my_user_id', 'technician_id'];
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('pc-' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('pc-' + k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } },
+  del(k) { try { localStorage.removeItem('pc-' + k); } catch (e) { /* ignore */ } },
+};
+
+const DEFAULT_CFG = { auth: 'http://localhost:8080', property: 'http://localhost:8086', wallet: 'http://localhost:8084' };
+const state = {
+  cfg: Object.assign({}, DEFAULT_CFG, store.get('cfg', {})),
+  sessions: store.get('sessions', []),
+  active: store.get('active', null),
+  ctx: store.get('ctx', {}),
+  presets: store.get('presets', []),
+  theme: store.get('theme', (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'),
+  log: [],
+  health: {},
+  guest: false,
+};
+
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    const v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+    else if (k === 'value' || k === 'checked' || k === 'disabled' || k === 'selected') el[k] = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  const add = (c) => {
+    if (c == null || c === false) return;
+    if (Array.isArray(c)) c.forEach(add);
+    else el.appendChild(c.nodeType ? c : document.createTextNode(String(c)));
+  };
+  kids.forEach(add);
+  return el;
+}
+
+const ICONS = {
+  home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-5 7-5s7 1.5 7 5"/><path d="M16 4.5a3.5 3.5 0 010 7"/><path d="M18 15c2.5.5 4 2 4 5"/>',
+  building: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/>',
+  door: '<path d="M6 21V4a1 1 0 011-1h10a1 1 0 011 1v17"/><path d="M3 21h18"/><circle cx="14.5" cy="12.5" r=".8"/>',
+  file: '<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/>',
+  coins: '<ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v5c0 1.7 2.7 3 6 3s6-1.3 6-3V7"/><path d="M15 10.5c3 .3 6 1.3 6 2.7v4c0 1.7-2.7 3-6 3-1.7 0-3.2-.3-4.3-.9"/>',
+  wallet: '<path d="M3 7a2 2 0 012-2h13v4"/><path d="M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2z"/><circle cx="16.5" cy="14.5" r="1.2"/>',
+  gauge: '<path d="M4 16a8 8 0 1116 0"/><path d="M12 16l4-5"/>',
+  bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  wrench: '<path d="M14.5 6.5a4 4 0 005 5L21 13l-8 8a2.1 2.1 0 01-3-3l8-8z"/><path d="M14.5 6.5a4 4 0 014-4l-2.5 2.5 1.5 1.5L20 4"/>',
+  clip: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/>',
+  bell: '<path d="M6 17V11a6 6 0 0112 0v6l2 2H4z"/><path d="M10 21h4"/>',
+  ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  chart: '<path d="M4 20V4M4 20h16"/><path d="M8 16v-5M12 16V8M16 16v-8"/>',
+  pulse: '<path d="M3 12h4l2-6 4 12 2-6h6"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+  play: '<path d="M7 4l13 8-13 8z"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  moon: '<path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',
+  refresh: '<path d="M20 11a8 8 0 00-14-4L4 9"/><path d="M4 4v5h5M4 13a8 8 0 0014 4l2-2"/><path d="M20 20v-5h-5"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  logout: '<path d="M10 4H5a1 1 0 00-1 1v14a1 1 0 001 1h5"/><path d="M15 8l4 4-4 4M19 12H9"/>',
+  check: '<path d="M5 12l5 5L20 7"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+};
+function ico(name, size) {
+  const s = h('span', { class: 'ico-w', style: { display: 'inline-grid' } });
+  s.innerHTML = '<svg class="ic" viewBox="0 0 24 24"' + (size ? ' style="width:' + size + 'px;height:' + size + 'px"' : '') + '>' + (ICONS[name] || ICONS.list) + '</svg>';
+  return s;
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function plain(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/`?\{\{home_owner_token\}\}`?/g, 'a home owner session')
+    .replace(/`?\{\{admin_token\}\}`?/g, 'an admin session')
+    .replace(/`?\{\{token\}\}`?/g, 'the signed in session')
+    .replace(/\{\{(\w+)\}\}/g, '$1');
+}
+function md(s) {
+  return esc(plain(s)).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+}
+function mdNode(s, tag) { return h(tag || 'div', { class: 'desc', html: md(s) }); }
+
+function toast(msg, kind) {
+  let box = $('#toasts');
+  if (!box) { box = h('div', { class: 'toasts', id: 'toasts' }); document.body.appendChild(box); }
+  const t = h('div', { class: 'toast ' + (kind || '') }, msg);
+  box.appendChild(t);
+  setTimeout(() => t.remove(), kind === 'err' ? 5200 : 2600);
+}
+function copyText(t) {
+  const done = () => toast('Copied', 'ok');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => toast('Copy blocked by the browser', 'err'));
+  else { const a = h('textarea', { value: t }); document.body.appendChild(a); a.select(); try { document.execCommand('copy'); done(); } catch (e) { toast('Copy blocked', 'err'); } a.remove(); }
+}
+
+function money(n) {
+  const v = Number(n);
+  if (!isFinite(v)) return String(n);
+  return (v < 0 ? '-' : '') + '$' + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+const MONEY_KEY = /(amount|rent|deposit|balance|total|price|due|credit|arrears|paid|fee|cost|revenue|income|outstanding|charge)/i;
+const NOT_MONEY = /(count|rate|percent|id$|number|date|days|months|period|status|currency|type|method|reference)/i;
+function isMoneyKey(k) { return MONEY_KEY.test(k) && !NOT_MONEY.test(k); }
+
+function statusClass(v) {
+  const s = String(v).toUpperCase();
+  if (/^(ACTIVE|PAID|COMPLETED|SUCCESS|OCCUPIED|HELD|REFUNDED|SENT|CONFIRMED|UP|OK|APPROVED|AVAILABLE|VERIFIED|RESOLVED|TRUE)$/.test(s)) return 'ok';
+  if (/^(PENDING|SCHEDULED|ASSIGNED|IN_PROGRESS|PARTIAL|PARTIALLY_PAID|DRAFT|OPEN|PROCESSING|UNPAID|RESERVED|MAINTENANCE|VACANT|UNDER_MAINTENANCE)$/.test(s)) return 'warn';
+  if (/^(OVERDUE|FAILED|CANCELLED|TERMINATED|EXPIRED|REJECTED|DOWN|ERROR|FALSE|BLACKLISTED|FROZEN|SUSPENDED|LATE)$/.test(s)) return 'bad';
+  return 'info';
+}
+
+function jwt(token) {
+  try {
+    const p = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(p + '==='.slice((p.length + 3) % 4)))));
+  } catch (e) { return null; }
+}
+const normRole = (r) => String(r || '').replace(/^ROLE_/, '').toUpperCase();
+
+/* ---------- sessions and context ---------- */
+function persistSessions() { store.set('sessions', state.sessions); store.set('active', state.active); }
+function activeSession() { return state.sessions.find((s) => s.id === state.active) || state.sessions[0] || null; }
+function addSession(data, email) {
+  const token = data.token || data.accessToken || data.access_token;
+  if (!token) return null;
+  const claims = jwt(token) || {};
+  let roles = claims.roles || claims.authorities || data.roles || (data.role ? [data.role] : []);
+  if (typeof roles === 'string') roles = [roles];
+  roles = roles.map(normRole);
+  if (data.role && !roles.includes(normRole(data.role))) roles.push(normRole(data.role));
+  const exp = claims.exp ? claims.exp * 1000 : Date.now() + (Number(data.expiresIn) > 1e6 ? Number(data.expiresIn) : (Number(data.expiresIn) || 900) * 1000);
+  const mail = claims.sub && String(claims.sub).includes('@') ? claims.sub : email;
+  const id = claims.sid || mail || ('s' + Date.now());
+  const sess = { id: String(id), email: mail || email, userId: claims.userId || claims.uid || data.userId || '', roles, token, refreshToken: data.refreshToken || data.refresh_token || '', exp, deviceToken: data.deviceToken || '', at: Date.now() };
+  const i = state.sessions.findIndex((s) => s.email === sess.email && s.roles.join() === sess.roles.join());
+  if (i >= 0) state.sessions[i] = sess; else state.sessions.push(sess);
+  state.active = sess.id;
+  persistSessions();
+  return sess;
+}
+function dropSession(id) {
+  state.sessions = state.sessions.filter((s) => s.id !== id);
+  if (state.active === id) state.active = state.sessions[0] ? state.sessions[0].id : null;
+  persistSessions();
+}
+function pickSession(role, forcedId) {
+  if (forcedId && forcedId !== 'auto') return state.sessions.find((s) => s.id === forcedId) || null;
+  if (role === 'public') return null;
+  const act = activeSession();
+  const want = role === 'owner' ? /^HOME_OWNER$/ : role === 'admin' ? /ADMIN/ : null;
+  if (!want) return act;
+  if (act && act.roles.some((r) => want.test(r))) return act;
+  return state.sessions.find((s) => s.roles.some((r) => want.test(r))) || act;
+}
+const roleLabel = (s) => (s && s.roles.length ? s.roles.map((r) => r.replace(/_/g, ' ').toLowerCase()).join(', ') : 'user');
+
+function ctxGet(k) {
+  const v = state.ctx[k];
+  if (v != null && v !== '') return v;
+  const alt = SYNC[k];
+  if (alt && state.ctx[alt]) return state.ctx[alt];
+  const s = activeSession();
+  if (k === 'email' && s) return s.email;
+  if (USERISH.includes(k) && s && s.userId) return s.userId;
+  return '';
+}
+function ctxSet(k, v) {
+  if (v == null || v === '') delete state.ctx[k]; else state.ctx[k] = String(v);
+  if (SYNC[k]) { if (v == null || v === '') delete state.ctx[SYNC[k]]; else state.ctx[SYNC[k]] = String(v); }
+  store.set('ctx', state.ctx);
+  document.dispatchEvent(new CustomEvent('ctx'));
+}
+
+/* ---------- api ---------- */
+const refreshing = {};
+async function rawFetch(url, opts) {
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url, opts);
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+    return { status: res.status, ok: res.ok, ms: Math.round(performance.now() - t0), data, text, ctype: res.headers.get('content-type') || '' };
+  } catch (e) {
+    return { status: 0, ok: false, ms: Math.round(performance.now() - t0), data: null, text: '', error: String(e && e.message || e), ctype: '' };
+  }
+}
+async function refreshSession(sess) {
+  if (!sess || !sess.refreshToken) return false;
+  if (refreshing[sess.id]) return refreshing[sess.id];
+  refreshing[sess.id] = (async () => {
+    const r = await rawFetch(state.cfg.auth.replace(/\/+$/, '') + '/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ refreshToken: sess.refreshToken }) });
+    logEntry({ svc: 'auth', method: 'POST', url: state.cfg.auth + '/auth/refresh', reqBody: { refreshToken: '***' }, r, note: 'token refresh' });
+    if (r.ok && r.data && (r.data.token || r.data.accessToken)) {
+      const t = r.data.token || r.data.accessToken;
+      const c = jwt(t) || {};
+      sess.token = t;
+      sess.refreshToken = r.data.refreshToken || sess.refreshToken;
+      sess.exp = c.exp ? c.exp * 1000 : Date.now() + 15 * 60000;
+      persistSessions();
+      document.dispatchEvent(new CustomEvent('sess'));
+      return true;
+    }
+    return false;
+  })();
+  const ok = await refreshing[sess.id];
+  delete refreshing[sess.id];
+  return ok;
+}
+function logEntry(e) {
+  e.at = new Date();
+  state.log.unshift(e);
+  if (state.log.length > 150) state.log.pop();
+  document.dispatchEvent(new CustomEvent('log'));
+}
+function buildUrl(svc, path, query) {
+  let url = state.cfg[svc].replace(/\/+$/, '') + path;
+  const qs = [];
+  for (const k in (query || {})) if (query[k] !== '' && query[k] != null) qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(query[k]));
+  if (qs.length) url += (url.includes('?') ? '&' : '?') + qs.join('&');
+  return url;
+}
+async function call(o) {
+  const { svc, method, path, query, body, session } = o;
+  const url = buildUrl(svc, path, query);
+  const headers = { Accept: 'application/json' };
+  if (body !== undefined && body !== null) headers['Content-Type'] = 'application/json';
+  const send = async () => {
+    if (session) {
+      if (session.exp - Date.now() < 45000) await refreshSession(session);
+      headers.Authorization = 'Bearer ' + session.token;
+    }
+    return rawFetch(url, { method, headers, body: body !== undefined && body !== null ? JSON.stringify(body) : undefined });
+  };
+  let r = await send();
+  if (r.status === 401 && session && session.refreshToken && !o._retried) {
+    if (await refreshSession(session)) { headers.Authorization = 'Bearer ' + session.token; r = await rawFetch(url, { method, headers, body: body != null ? JSON.stringify(body) : undefined }); }
+  }
+  const masked = Object.assign({}, headers);
+  if (masked.Authorization) masked.Authorization = 'Bearer ' + session.token.slice(0, 12) + '...';
+  r.req = { method, url, headers: masked, body };
+  r.svc = svc;
+  r.session = session;
+  if (!o.quiet) logEntry({ svc, method, url, reqBody: body, r, who: session ? session.email : 'anonymous' });
+  return r;
+}
+
+function explain(r) {
+  if (!r) return null;
+  const d = r.data || {};
+  const msg = d.message || d.error || d.detail || '';
+  if (r.status === 0) {
+    const where = r.req ? r.req.url : '';
+    return { kind: 'bad', text: 'Could not reach ' + where + '. Check that the service is running and the base URL in Settings is right.' + (location.protocol === 'file:' ? ' This page is open from a file, so the browser sends the origin "null", which the services block. Serve it over http on port 3000, 4200 or 5173 (for example: python3 -m http.server 3000).' : ' If the service is running, the browser may be blocking the call (CORS): this page must be served from an allowed origin such as http://localhost:3000, 4200 or 5173.') };
+  }
+  if (r.status === 401) return { kind: 'bad', text: (d.code === 'SESSION_EXPIRED' ? 'The session expired. ' : 'Authentication is required. ') + 'Sign in again from Accounts' + (d.code ? ' (' + d.code + ')' : '') + '.' };
+  if (r.status === 403) return { kind: 'bad', text: 'Your role is not allowed to do this. ' + (msg ? msg + '. ' : '') + 'Owner endpoints need a home owner session and admin endpoints need an admin session.' };
+  if (r.status === 400 && d.errors) {
+    const list = typeof d.errors === 'object' ? Object.entries(d.errors).map(([k, v]) => k + ': ' + (Array.isArray(v) ? v.join(', ') : v)) : [String(d.errors)];
+    return { kind: 'bad', text: 'Validation failed. ' + list.join(' | ') };
+  }
+  if (r.status === 503) {
+    if (d.code === 'SERVICE_OFFLINE' || d.service) return { kind: 'bad', text: (d.service || 'A downstream service') + ' is offline' + (d.retryAfterSeconds ? '. Retry in about ' + d.retryAfterSeconds + ' seconds.' : '.') };
+    return { kind: 'bad', text: 'Service unavailable' + (d.code ? ' (' + d.code + ')' : '') + (d.retryable ? '. It is safe to retry.' : '.') + (msg ? ' ' + msg : '') };
+  }
+  if (r.status === 404) return { kind: 'bad', text: msg || 'Not found. The id in the path may not exist, or you do not own it.' };
+  if (r.status >= 400) return { kind: 'bad', text: (msg || 'Request failed') + (d.code ? ' (' + d.code + ')' : '') };
+  return null;
+}
+
+/* ---------- hand written auth and wallet endpoints ---------- */
+const T = (key, label, value, o) => Object.assign({ key, label, type: 'text', required: false, value: value == null ? '' : value }, o || {});
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+function EP(svc, page, group, name, method, path, o) {
+  o = o || {};
+  const params = [];
+  (path.match(/\{\{(\w+)\}\}/g) || []).forEach((m) => { const k = m.slice(2, -2); params.push({ key: k, label: k.replace(/_/g, ' ') }); });
+  return {
+    id: svc + '.' + slug(name), svc, page, group, name, method, path, query: o.query || [], params,
+    role: o.role || 'any', who: o.who || '', desc: o.desc || '', body: o.fields ? { fields: o.fields, notes: [] } : null,
+  };
+}
+const MONEY = (v) => T('amount', 'Amount', v, { type: 'number', step: '0.01', required: true });
+
+const EXTRA = [
+  /* auth */
+  EP('auth', 'Accounts', 'Create and verify', 'Sign up', 'POST', '/auth/signup', { role: 'public', desc: 'Creates a user account and sends an activation email.', fields: [
+    T('username', 'Username', 'john_doe', { required: true }), T('firstName', 'First name', 'John', { required: true }), T('middleName', 'Middle name', 'Kipchoge'),
+    T('lastName', 'Last name', 'Doe', { required: true }), T('email', 'Email', '', { type: 'email', required: true, bind: 'email' }), T('phoneNumber', 'Phone number', '+254712345678', { required: true }),
+    T('address1', 'Address line 1', '123 Ngong Road'), T('address2', 'Address line 2', 'Apartment 12'), T('country', 'Country', 'Kenya'),
+    T('language', 'Language', 'ENGLISH', { type: 'select', options: ['ENGLISH', 'SWAHILI'] }), T('password', 'Password', '', { required: true, type: 'password' })] }),
+  EP('auth', 'Accounts', 'Create and verify', 'Verify email', 'GET', '/auth/verify/{{verification_token}}', { role: 'public', desc: 'Confirms an account with the token from the activation email.' }),
+  EP('auth', 'Accounts', 'Create and verify', 'Resend activation email', 'POST', '/auth/resend-activation', { role: 'public', query: [{ key: 'email', value: '', bind: 'email' }] }),
+  EP('auth', 'Accounts', 'Session', 'Refresh tokens', 'POST', '/auth/refresh', { role: 'public', desc: 'Refresh tokens rotate: the old refresh token stops working after use. The console does this for you when a token is about to expire.', fields: [T('refreshToken', 'Refresh token', '', { required: true, bind: '@refresh' })] }),
+  EP('auth', 'Accounts', 'Session', 'Sign out', 'POST', '/auth/logout', { desc: 'Ends the current session on the server.' }),
+  EP('auth', 'Accounts', 'Passwords', 'Forgot password', 'POST', '/auth/forgot-password', { role: 'public', fields: [T('email', 'Email', '', { type: 'email', required: true, bind: 'email' })] }),
+  EP('auth', 'Accounts', 'Passwords', 'Reset password', 'POST', '/auth/reset-password', { role: 'public', fields: [T('token', 'Reset token from the email', '', { required: true, bind: 'reset_token' }), T('newPassword', 'New password', '', { type: 'password', required: true }), T('confirmPassword', 'Confirm password', '', { type: 'password', required: true })] }),
+  EP('auth', 'Accounts', 'Passwords', 'Change password', 'POST', '/auth/change-password', { fields: [T('oldPassword', 'Current password', '', { type: 'password', required: true }), T('newPassword', 'New password', '', { type: 'password', required: true }), T('confirmPassword', 'Confirm password', '', { type: 'password', required: true })] }),
+  EP('auth', 'Accounts', 'Profile', 'Get my profile', 'GET', '/profile/me'),
+  EP('auth', 'Accounts', 'Profile', 'Update my profile', 'PUT', '/profile/update', { fields: [
+    T('username', 'Username', 'john_doe'), T('firstName', 'First name', 'John'), T('middleName', 'Middle name', 'Kipchoge'), T('lastName', 'Last name', 'Doe'),
+    T('phoneNumber', 'Phone number', '+254712345678'), T('address1', 'Address line 1', '123 Ngong Road'), T('country', 'Country', 'Kenya'), T('language', 'Language', 'ENGLISH', { type: 'select', options: ['ENGLISH', 'SWAHILI'] })] }),
+  EP('auth', 'Accounts', 'Profile', 'Search profiles', 'GET', '/profile/search', { query: [{ key: 'query', value: 'bill' }] }),
+  EP('auth', 'Accounts', 'Security', 'List my active sessions', 'GET', '/security/sessions'),
+  EP('auth', 'Accounts', 'Security', 'List my devices', 'GET', '/security/devices'),
+  EP('auth', 'Accounts', 'Security', 'Sign in history', 'GET', '/security/sign-ins'),
+  EP('auth', 'Accounts', 'Security', 'My security events', 'GET', '/security/events'),
+  EP('auth', 'Accounts', 'Security', 'Check auth service health', 'GET', '/health', { role: 'public' }),
+
+  /* wallet */
+  EP('wallet', 'Wallet', 'Wallet', 'Create wallet', 'POST', '/wallet/create', { desc: 'Creates the signed in user\'s wallet. A wallet is needed before rent can be paid.' }),
+  EP('wallet', 'Wallet', 'Wallet', 'Get wallet balance', 'GET', '/wallet/balance'),
+  EP('wallet', 'Wallet', 'Wallet', 'Get wallet details', 'GET', '/wallet'),
+  EP('wallet', 'Wallet', 'Wallet', 'Get wallet statement', 'POST', '/wallet/statement', { fields: [T('fromDate', 'From', '2026-10-01', { type: 'date', required: true }), T('toDate', 'To', '2026-10-31', { type: 'date', required: true }), T('type', 'Type', '', { type: 'select', options: ['', 'DEPOSIT', 'DISBURSEMENT', 'TRANSFER', 'PAYMENT'] })] }),
+  EP('wallet', 'Wallet', 'Wallet', 'Update M-Pesa phone number', 'PUT', '/wallet/mpesa-phone', { fields: [T('mpesaPhoneNumber', 'M-Pesa phone number', '254705912645', { required: true })] }),
+  EP('wallet', 'Wallet', 'Add money', 'Deposit from M-Pesa (STK push)', 'POST', '/wallet/deposit', { desc: 'Sends an STK push to the wallet\'s M-Pesa phone number.', fields: [MONEY(20), T('provider', 'Provider', 'MPESA', { type: 'hidden' })] }),
+  EP('wallet', 'Wallet', 'Add money', 'Deposit from PayPal', 'POST', '/wallet/deposit', { fields: [MONEY(20), T('provider', 'Provider', 'PAYPAL', { type: 'hidden' }), T('currency', 'Currency', 'USD')] }),
+  EP('wallet', 'Wallet', 'Add money', 'Deposit from Stripe', 'POST', '/wallet/deposit', { fields: [MONEY(100), T('provider', 'Provider', 'STRIPE', { type: 'hidden' }), T('currency', 'Currency', 'usd')] }),
+  EP('wallet', 'Wallet', 'Add money', 'Deposit from Flutterwave (mobile money)', 'POST', '/wallet/deposit', { fields: [MONEY(15), T('provider', 'Provider', 'FLUTTERWAVE', { type: 'hidden' }), T('currency', 'Currency', 'GHS'), T('customerName', 'Customer name', 'John Doe'), T('customerPhone', 'Customer phone', '0551234987'), T('flutterwaveCountryCode', 'Country code', '233'), T('flutterwaveMobileNetwork', 'Mobile network', 'MTN')] }),
+  EP('wallet', 'Wallet', 'Add money', 'Deposit with NOWPayments', 'POST', '/wallet/deposit', { fields: [MONEY(50), T('provider', 'Provider', 'NOWPAYMENTS', { type: 'hidden' }), T('currency', 'Pay currency', 'usdttrc20'), T('nowPaymentsPriceCurrency', 'Price currency', 'usd'), T('nowPaymentsSandboxCase', 'Sandbox case', 'success', { type: 'select', options: ['success', 'failed', 'partially_paid'] })] }),
+  EP('wallet', 'Wallet', 'Confirm a deposit', 'Confirm Flutterwave deposit', 'POST', '/wallet/deposit/flutterwave/confirm', { fields: [T('txRef', 'Transaction reference', '', { required: true, bind: 'tx_ref_flutterwave' })] }),
+  EP('wallet', 'Wallet', 'Confirm a deposit', 'Confirm Stripe deposit', 'POST', '/wallet/deposit/stripe/confirm', { fields: [T('paymentIntentId', 'Payment intent id', '', { required: true, bind: 'payment_intent_id' })] }),
+  EP('wallet', 'Wallet', 'Confirm a deposit', 'Confirm PayPal deposit', 'POST', '/wallet/deposit/paypal/confirm', { fields: [T('orderId', 'Order id', '', { required: true, bind: 'paypal_order_id' })] }),
+  EP('wallet', 'Wallet', 'History', 'Deposit history', 'GET', '/deposits/history'),
+  EP('wallet', 'Wallet', 'History', 'Transfer history', 'GET', '/wallet/transfer/history'),
+  EP('wallet', 'Wallet', 'History', 'Disbursement history', 'GET', '/disbursements/history'),
+  EP('wallet', 'Wallet', 'History', 'Payment history', 'GET', '/payments/history', { query: [{ key: 'status', value: 'SUCCESS', options: ['SUCCESS', 'PENDING', 'FAILED'] }] }),
+  EP('wallet', 'Wallet', 'Move money', 'Transfer funds', 'POST', '/wallet/transfer', { desc: 'Sends money to another wallet by the recipient\'s account number (their email).', fields: [MONEY(10), T('recipientAccountNumber', 'Recipient account (email)', '', { required: true, type: 'email' }), T('description', 'Description', 'Rent split')] }),
+  EP('wallet', 'Wallet', 'Admin', 'Get wallet of a user', 'GET', '/admin/wallet/wallets/{{user_id}}', { role: 'admin', desc: 'Admin only. Handy for finding a tenant\'s wallet before topping it up.' }),
+  EP('wallet', 'Wallet', 'Admin', 'Credit a wallet (admin top-up)', 'POST', '/admin/wallet/wallets/{{user_id}}/credit', { role: 'admin', desc: 'Admin only. Adds money to any user\'s wallet, which is the quickest way to give a test tenant funds to pay rent.', fields: [MONEY(500), T('reason', 'Reason', 'Test funds for rent payment', { required: true })] }),
+  EP('wallet', 'Wallet', 'Admin', 'Check wallet service health', 'GET', '/system/health', { role: 'public' }),
+];
+
+/* ---------- id finder: search instead of pasting ids ---------- */
+const FK = {
+  property_id: 'property', propertyId: 'property', unit_id: 'unit', rental_unit_id: 'unit', rentalUnitId: 'unit', unitId: 'unit', rentalUnitIds: 'unit',
+  lease_id: 'lease', leaseId: 'lease', leaseIds: 'lease', tenant_id: 'tenant', tenantId: 'tenant', owner_id: 'owner', ownerId: 'owner',
+  maintenance_id: 'maintenance', maintenance_request_id: 'maintenance', maintenanceRequestId: 'maintenance',
+  work_order_id: 'workorder', workOrderId: 'workorder', inspection_id: 'inspection', inspectionId: 'inspection',
+  scheduled_notice_id: 'bulknotice', notice_id: 'notice', noticeId: 'notice', meter_reading_id: 'reading', meterReadingId: 'reading', bill_id: 'bill', billId: 'bill',
+  user_id: 'user', userId: 'user', assigned_to_id: 'user', technician_id: 'user', assignedTo: 'user', inspector_user_id: 'user', recipientAccountNumber: 'useremail',
+};
+const KIND_CTX = { property: 'property_id', unit: 'unit_id', lease: 'lease_id', tenant: 'tenant_id', owner: 'owner_id', maintenance: 'maintenance_id', workorder: 'work_order_id', inspection: 'inspection_id', bulknotice: 'scheduled_notice_id', notice: 'notice_id', reading: 'meter_reading_id', bill: 'bill_id' };
+const KIND_TITLE = { property: 'property', unit: 'rental unit', lease: 'lease', tenant: 'tenant', owner: 'owner', maintenance: 'maintenance request', workorder: 'work order', inspection: 'inspection', bulknotice: 'bulk notice', notice: 'notice', reading: 'meter reading', bill: 'utility bill', user: 'user', useremail: 'user' };
+const KIND_EMPTY = { property: 'Create a property first.', unit: 'Create a rental unit first.', lease: 'Create a lease first.', tenant: 'Create a lease first, or a tenant profile.', owner: 'Create an owner profile first.', maintenance: 'No maintenance requests yet.', workorder: 'No work orders yet.', inspection: 'No inspections yet.', bulknotice: 'No bulk notices yet.', notice: 'No notices yet.', reading: 'No meter readings yet.', bill: 'No utility bills yet.', user: '', useremail: '' };
+const kindOf = (key, bind) => FK[key] || FK[bind] || null;
+const short = (id) => (id && id.length > 12 ? id.slice(0, 6) + '...' + id.slice(-4) : id || '');
+const nameOf = (o) => o ? (o.fullName || [o.firstName, o.middleName, o.lastName].filter(Boolean).join(' ').trim() || o.name || o.username || o.email || '') : '';
+const day = (v) => (v ? String(v).slice(0, 10) : '');
+const dot = (a) => a.filter((x) => x !== '' && x != null).join('  |  ');
+
+async function G(svc, path, role, query) {
+  const s = pickSession(role);
+  if (role !== 'public' && !s) throw new Error('Sign in first.');
+  const r = await call({ svc, method: 'GET', path, query, session: s, quiet: true });
+  if (!r.ok) { const e = new Error((explain(r) || {}).text || 'The request failed'); e.status = r.status; throw e; }
+  return r.data;
+}
+const asRows = (d) => extractRows(d) || (d && typeof d === 'object' ? [d] : []);
+const ownerSession = () => { const a = activeSession(); return !a || a.roles.some((r) => r === 'HOME_OWNER' || /ADMIN/.test(r)); };
+const uniq = (rows) => { const seen = new Set(); return rows.filter((r) => r.id && !seen.has(r.id) && seen.add(r.id)); };
+
+const LOADERS = {
+  async property() {
+    return asRows(await G('property', '/api/v1/properties/me', 'owner')).map((p) => ({ id: p.id || p._id, label: p.title || p.name || 'Property', sub: dot([p.propertyType, p.address && p.address.city, p.registrationNumber]), raw: p }));
+  },
+  async unit() {
+    let units = [];
+    if (ownerSession()) {
+      const props = asRows(await G('property', '/api/v1/properties/me', 'owner')).slice(0, 15);
+      const sel = ctxGet('property_id');
+      props.sort((a, b) => (a.id === sel ? -1 : b.id === sel ? 1 : 0));
+      const lists = await Promise.all(props.map((p) => G('property', '/api/v1/units/property/' + encodeURIComponent(p.id || p._id), 'owner').then((d) => asRows(d).map((u) => Object.assign({ _p: p.title || p.name }, u))).catch(() => [])));
+      units = [].concat(...lists);
+    } else {
+      const t = await G('property', '/api/v1/tenants/me', 'any');
+      const leases = asRows(await G('property', '/api/v1/leases/tenant/' + encodeURIComponent(t.id || t._id), 'any'));
+      const ids = [...new Set(leases.map((l) => l.rentalUnitId).filter(Boolean))];
+      units = (await Promise.all(ids.map((id) => G('property', '/api/v1/units/' + encodeURIComponent(id), 'any').catch(() => null)))).filter(Boolean);
+    }
+    return units.map((u) => ({ id: u.id || u._id, label: u.unitNumber || u.name || u.unitName || 'Unit', sub: dot([u._p, u.unitType, u.status, u.rentAmount != null ? money(u.rentAmount) : '']), raw: u }));
+  },
+  async lease() {
+    let list;
+    if (ownerSession()) list = asRows(await G('property', '/api/v1/leases/owner', 'owner'));
+    else { const t = await G('property', '/api/v1/tenants/me', 'any'); list = asRows(await G('property', '/api/v1/leases/tenant/' + encodeURIComponent(t.id || t._id), 'any')); }
+    return list.map((l) => ({ id: l.id || l._id, label: 'Lease ' + short(l.id || l._id), sub: dot([day(l.startDate) + ' to ' + day(l.endDate), l.monthlyRent != null ? money(l.monthlyRent) + '/month' : '', l.status]), raw: l }));
+  },
+  async tenant() {
+    if (!ownerSession()) { const t = await G('property', '/api/v1/tenants/me', 'any'); return [{ id: t.id || t._id, label: nameOf(t) || 'Me', sub: dot([t.email, t.phoneNumber]), raw: t }]; }
+    const leases = asRows(await G('property', '/api/v1/leases/owner', 'owner'));
+    const ids = [...new Set(leases.map((l) => l.tenantId).filter(Boolean))].slice(0, 25);
+    const rows = await Promise.all(ids.map((id) => G('property', '/api/v1/tenants/' + encodeURIComponent(id), 'any').then((t) => ({ id, label: nameOf(t) || 'Tenant ' + short(id), sub: dot([t.email, t.phoneNumber]), raw: t })).catch(() => ({ id, label: 'Tenant ' + short(id), sub: 'details not readable', raw: {} }))));
+    return rows;
+  },
+  async owner() { const o = await G('property', '/api/v1/owners/me', 'owner'); return [{ id: o.id || o._id, label: nameOf(o) || 'Owner profile', sub: dot([o.email, o.phoneNumber]), raw: o }]; },
+  async maintenance() {
+    const lists = await Promise.all(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map((s) => G('property', '/api/v1/maintenance', 'any', { status: s }).then(asRows).catch(() => [])));
+    return uniq([].concat(...lists).map((m) => ({ id: m.id || m._id, label: m.title || (m.description || '').slice(0, 60) || 'Request', sub: dot([m.status, m.priority, m.category, day(m.createdAt)]), raw: m })));
+  },
+  async workorder() {
+    const lists = await Promise.all(['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map((s) => G('property', '/api/v1/work-orders', 'any', { status: s }).then(asRows).catch(() => [])));
+    return uniq([].concat(...lists).map((w) => ({ id: w.id || w._id, label: w.title || (w.description || '').slice(0, 60) || 'Work order ' + short(w.id), sub: dot([w.status, w.priority, day(w.createdAt)]), raw: w })));
+  },
+  async inspection() {
+    const lists = await Promise.all(['SCHEDULED', 'COMPLETED', 'CANCELLED'].map((s) => G('property', '/api/v1/inspections/me', 'owner', { status: s }).then(asRows).catch(() => [])));
+    return uniq([].concat(...lists).map((i) => ({ id: i.id || i._id, label: i.inspectionType || i.type || 'Inspection ' + short(i.id), sub: dot([i.status, day(i.scheduledDate || i.scheduledAt)]), raw: i })));
+  },
+  async bulknotice() { return asRows(await G('property', '/api/v1/notices/bulk/mine', 'owner')).map((n) => ({ id: n.id || n._id, label: n.title || 'Bulk notice', sub: dot([n.status, n.noticeType, day(n.scheduledAt)]), raw: n })); },
+  async notice() {
+    const l = ctxGet('lease_id'); const t = ctxGet('tenant_id');
+    if (!l && !t) throw new Error('Pick a lease or a tenant first, because notices are listed per lease or tenant.');
+    const d = await G('property', l ? '/api/v1/notices/lease/' + encodeURIComponent(l) : '/api/v1/notices/tenant/' + encodeURIComponent(t), 'any');
+    return asRows(d).map((n) => ({ id: n.id || n._id, label: n.title || 'Notice', sub: dot([n.noticeType, n.status, day(n.createdAt || n.sentAt)]), raw: n }));
+  },
+  async reading() {
+    const u = ctxGet('unit_id'); if (!u) throw new Error('Pick a rental unit first, because meter readings are listed per unit.');
+    return asRows(await G('property', '/api/v1/meter-readings/unit/' + encodeURIComponent(u), 'any')).map((m) => ({ id: m.id || m._id, label: (m.meterType || 'Reading') + (m.readingValue != null ? ' ' + m.readingValue : ''), sub: dot([day(m.readingDate), m.utilityType]), raw: m }));
+  },
+  async bill() {
+    const u = ctxGet('unit_id'); const t = ctxGet('tenant_id');
+    if (!u && !t) throw new Error('Pick a rental unit or a tenant first, because bills are listed per unit or tenant.');
+    const d = await G('property', u && ownerSession() ? '/api/v1/utility-bills/unit/' + encodeURIComponent(u) : '/api/v1/utility-bills/tenant/' + encodeURIComponent(t || ''), 'any');
+    return asRows(d).map((b) => ({ id: b.id || b._id, label: (b.utilityType || 'Bill') + (b.totalAmount != null ? ' ' + money(b.totalAmount) : b.amount != null ? ' ' + money(b.amount) : ''), sub: dot([b.status, day(b.dueDate)]), raw: b }));
+  },
+  async user(q) {
+    if (!q || q.length < 2) return [];
+    const d = await G('auth', '/profile/search', 'any', { query: q });
+    return asRows(d).map((u) => ({ id: u.id || u.userId || u._id, label: nameOf(u) || u.email || 'User', sub: dot([u.email, u.username, u.role]), email: u.email, raw: u }));
+  },
+};
+LOADERS.useremail = LOADERS.user;
+
+function openFinder(kind, key, input, multi) {
+  const remote = kind === 'user' || kind === 'useremail';
+  const q = h('input', { class: 'fld', placeholder: remote ? 'Type a name or email (2 letters or more)' : 'Filter by name, status or id' });
+  const list = h('div', { class: 'picklist' });
+  const status = h('div', { class: 'small muted', style: { margin: '8px 0' } });
+  const chosen = new Set();
+  let rows = [], loaded = false, timer = null, modal = null;
+  const apply = (ids, row) => {
+    if (multi) {
+      const cur = input.value.split(/[\n,]+/).map((x) => x.trim()).filter(Boolean);
+      ids.forEach((i) => { if (!cur.includes(i)) cur.push(i); });
+      input.value = cur.join('\n');
+    } else {
+      input.value = ids[0];
+      const ck = KIND_CTX[kind];
+      if (ck) ctxSet(ck, ids[0]); else if (kind === 'user' && /^[a-z_]+$/.test(key)) ctxSet(key, ids[0]);
+      if (kind === 'lease' && row && row.raw) {
+        const filled = [];
+        if (row.raw.tenantId && !state.ctx.tenant_id) { ctxSet('tenant_id', row.raw.tenantId); filled.push('tenant_id'); }
+        if (row.raw.rentalUnitId && !state.ctx.unit_id) { ctxSet('unit_id', row.raw.rentalUnitId); filled.push('unit_id'); }
+        if (filled.length) toast('Also filled ' + filled.join(' and '), 'ok');
+      }
+    }
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    modal.remove();
+  };
+  const draw = () => {
+    const t = remote ? '' : q.value.toLowerCase();
+    const vis = rows.filter((r) => !t || (r.label + ' ' + r.sub + ' ' + r.id).toLowerCase().includes(t));
+    status.innerHTML = '';
+    list.innerHTML = '';
+    if (!vis.length) { status.textContent = remote ? (q.value.trim().length < 2 ? 'Type at least 2 letters to search.' : 'No one matches that.') : ((rows.length ? 'Nothing matches the filter.' : 'Nothing found. ' + (KIND_EMPTY[kind] || ''))); return; }
+    status.textContent = vis.length + (vis.length === 1 ? ' result' : ' results') + (multi ? '. Tick the ones you want.' : '. Click one to use it.');
+    vis.forEach((r) => {
+      const pick = remote && kind === 'useremail' ? r.email : r.id;
+      const cb = multi ? h('input', { type: 'checkbox', onclick: (e) => { e.stopPropagation(); if (cb.checked) chosen.add(pick); else chosen.delete(pick); } }) : null;
+      list.appendChild(h('div', { class: 'pickrow', onclick: () => { if (multi) { cb.checked = !cb.checked; if (cb.checked) chosen.add(pick); else chosen.delete(pick); } else apply([pick], r); } },
+        cb, h('div', { class: 'pm' }, h('div', { class: 'pl' }, r.label), r.sub ? h('div', { class: 'ps' }, r.sub) : null), h('span', { class: 'idc' }, kind === 'useremail' ? '' : short(r.id))));
+    });
+  };
+  const load = async () => {
+    status.innerHTML = ''; status.appendChild(h('span', {}, h('span', { class: 'spin' }), ' Searching...')); list.innerHTML = '';
+    try { rows = await LOADERS[kind](q.value.trim()); loaded = true; draw(); } catch (e) { rows = []; status.innerHTML = ''; list.innerHTML = ''; status.appendChild(h('div', { class: 'note bad' }, e.message)); }
+  };
+  q.addEventListener('input', () => { if (remote) { clearTimeout(timer); timer = setTimeout(load, 300); } else if (loaded) draw(); });
+  const body = h('div', {}, q, status, list, multi ? h('div', { class: 'row', style: { marginTop: '10px' } }, h('button', { class: 'btn', onclick: () => { if (!chosen.size) { toast('Tick at least one', 'err'); return; } apply([...chosen]); } }, 'Add selected')) : null);
+  modal = openModal('Find a ' + KIND_TITLE[kind], body);
+  setTimeout(() => q.focus(), 30);
+  if (remote) draw(); else load();
+}
+
+function withFinder(input, key, o) {
+  o = o || {};
+  const kind = o.kind || kindOf(key, o.bind);
+  if (!kind) return input;
+  const btn = h('button', { type: 'button', class: 'btn ghost sm', title: 'Search for a ' + KIND_TITLE[kind], onclick: () => openFinder(kind, key, input, o.multi) }, ico('search', 14), 'Find');
+  return h('div', { class: 'idrow' }, input, btn);
+}
+
+/* ---------- renderers, drawer, endpoint runner ---------- */
+const ALL = SPEC.endpoints.concat(EXTRA);
+const PAGE_EP = {};
+ALL.forEach((e) => { (PAGE_EP[e.page] = PAGE_EP[e.page] || []).push(e); });
+const ROLE_TXT = { owner: 'owner', admin: 'admin', public: 'public', any: 'signed in' };
+const ID_KEYS = { propertyId: 'property_id', rentalUnitId: 'unit_id', unitId: 'unit_id', leaseId: 'lease_id', tenantId: 'tenant_id', ownerId: 'owner_id', maintenanceRequestId: 'maintenance_id', userId: 'user_id' };
+const PICK = { Properties: ['property_id'], 'Rental Units': ['unit_id'], Leases: ['lease_id'], 'Security Deposits': ['deposit_id'], 'Meter Readings': ['meter_reading_id'], 'Utility Bills': ['bill_id'], Maintenance: ['maintenance_id'], 'Work Orders': ['work_order_id'], Inspections: ['inspection_id'], Notices: ['notice_id'], Owners: ['owner_id'], Tenants: ['tenant_id'] };
+const CAPTURE = [
+  [/^Create property$/, ['property_id']], [/^Create rental unit$/, ['unit_id', 'rental_unit_id']], [/^Create lease$/, ['lease_id']],
+  [/^(Create tenant profile|Get my tenant profile)/, ['tenant_id']], [/^(Create owner profile|Get my owner profile)/, ['owner_id']],
+  [/^Create maintenance request$/, ['maintenance_id', 'maintenance_request_id']], [/^Create work order$/, ['work_order_id']],
+  [/^Create inspection$/, ['inspection_id']], [/^Send notice to/, ['notice_id']], [/^Send or schedule bulk notice$/, ['scheduled_notice_id']],
+  [/^Record meter reading$/, ['meter_reading_id']], [/^Generate bill/, ['bill_id']], [/^Hold deposit$/, ['deposit_id']],
+];
+
+function bindGet(b) {
+  if (b === '@refresh') { const s = activeSession(); return s ? s.refreshToken : ''; }
+  return ctxGet(b);
+}
+function resolvePath(path, vals) {
+  let missing = [];
+  const p = path.replace(/\{\{(\w+)\}\}/g, (m, k) => {
+    const v = vals && vals[k] != null ? vals[k] : ctxGet(k);
+    if (v === '' || v == null) { missing.push(k); return '{' + k + '}'; }
+    return encodeURIComponent(v);
+  });
+  return { path: p, missing };
+}
+function genRef(prefix) { return prefix + '-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase(); }
+
+/* value formatting */
+function fmtVal(k, v) {
+  if (v == null || v === '') return h('span', { class: 'muted' }, '-');
+  if (typeof v === 'boolean') return h('span', { class: 'pill ' + (v ? 'ok' : '') }, v ? 'yes' : 'no');
+  if (typeof v === 'number') return isMoneyKey(k) ? money(v) : String(v);
+  if (typeof v === 'string') {
+    if (/status|state|type$/i.test(k) && v.length < 24 && /^[A-Z_]+$/.test(v)) return h('span', { class: 'pill ' + statusClass(v) }, v.replace(/_/g, ' '));
+    if (/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(v)) { const d = new Date(v); return isNaN(d) ? v : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
+    if (/^[0-9a-f]{24}$/i.test(v) || /^[0-9a-f-]{36}$/i.test(v)) return h('span', { class: 'idc', title: v + ' (click to copy)', onclick: (e) => { e.stopPropagation(); copyText(v); } }, v.slice(0, 6) + '...' + v.slice(-4));
+    return v;
+  }
+  if (Array.isArray(v)) return v.every((x) => typeof x !== 'object') ? v.join(', ') : v.length + ' items';
+  return '{...}';
+}
+function scalarKeys(rows) {
+  const keys = [];
+  rows.slice(0, 25).forEach((r) => { if (r && typeof r === 'object') Object.keys(r).forEach((k) => { if (!keys.includes(k)) keys.push(k); }); });
+  const scalar = keys.filter((k) => rows.some((r) => r && r[k] != null && typeof r[k] !== 'object'));
+  const pri = (k) => (/^(id|_id)$/.test(k) ? -3 : /name|title|number|email/i.test(k) ? -2 : /status/i.test(k) ? -1 : /(createdAt|updatedAt|__v|version)/i.test(k) ? 5 : 0);
+  return scalar.sort((a, b) => pri(a) - pri(b)).slice(0, 7);
+}
+function extractRows(d) {
+  if (Array.isArray(d)) return d;
+  if (d && typeof d === 'object') {
+    for (const k of ['content', 'items', 'data', 'results', 'records']) if (Array.isArray(d[k])) return d[k];
+    const ak = Object.keys(d).find((k) => Array.isArray(d[k]) && d[k].length && typeof d[k][0] === 'object');
+    if (ak) return d[ak];
+  }
+  return null;
+}
+function label(k) { return k.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()); }
+
+function kvView(obj, depth) {
+  const box = h('div', { class: depth ? 'sub-kv kv' : 'kv' });
+  Object.keys(obj).forEach((k) => {
+    const v = obj[k];
+    box.appendChild(h('div', { class: 'k' }, label(k)));
+    let val;
+    if (Array.isArray(v) && v.length && typeof v[0] === 'object') val = dataTable(v, { compact: true });
+    else if (v && typeof v === 'object' && !Array.isArray(v)) val = kvView(v, (depth || 0) + 1);
+    else val = fmtVal(k, v);
+    box.appendChild(h('div', {}, val));
+  });
+  return box;
+}
+function pretty(data, o) {
+  o = o || {};
+  const rows = extractRows(data);
+  if (rows) {
+    if (!rows.length) return h('div', { class: 'empty' }, 'Nothing here yet.');
+    const paging = data && !Array.isArray(data) && (data.totalElements != null) ? h('div', { class: 'small muted', style: { padding: '8px 12px' } }, 'Page ' + ((data.number || 0) + 1) + ' of ' + (data.totalPages || 1) + ', ' + data.totalElements + ' in total') : null;
+    return h('div', {}, dataTable(rows, o), paging);
+  }
+  if (data && typeof data === 'object') {
+    const nums = Object.keys(data).filter((k) => typeof data[k] === 'number');
+    const wrap = h('div', { style: { padding: o.flush ? '14px 16px' : 0 } });
+    if (o.tiles && nums.length) {
+      wrap.appendChild(h('div', { class: 'tiles' }, nums.map((k) => h('div', { class: 'tile' + (isMoneyKey(k) ? ' gold' : '') }, h('div', { class: 'l' }, label(k)), h('div', { class: 'v' }, isMoneyKey(k) ? money(data[k]) : String(data[k]))))));
+      const rest = {}; Object.keys(data).forEach((k) => { if (typeof data[k] !== 'number') rest[k] = data[k]; });
+      if (Object.keys(rest).length) wrap.appendChild(kvView(rest));
+    } else wrap.appendChild(kvView(data));
+    return wrap;
+  }
+  return h('div', { style: { padding: '12px 16px' } }, String(data == null ? '(empty response)' : data));
+}
+function dataTable(rows, o) {
+  o = o || {};
+  const keys = scalarKeys(rows);
+  if (!keys.length) return h('pre', { class: 'json' }, JSON.stringify(rows, null, 2));
+  const body = h('tbody');
+  const tbl = h('table', { class: 't' }, h('thead', {}, h('tr', {}, keys.map((k) => h('th', {}, label(k))), o.onPick ? h('th', {}, '') : null)), body);
+  rows.forEach((r) => {
+    const tr = h('tr', { class: o.onPick || o.expand !== false ? 'data' : '' }, keys.map((k) => h('td', { class: typeof r[k] === 'number' ? 'num' : '' }, fmtVal(k, r[k]))));
+    let det = null;
+    tr.addEventListener('click', () => {
+      if (det) { det.remove(); det = null; tr.classList.remove('sel'); return; }
+      tr.classList.add('sel');
+      const id = r.id || r._id;
+      const useBtns = [];
+      if (o.pickKeys && id) o.pickKeys.forEach((ck) => useBtns.push(h('button', { class: 'btn sm brass', onclick: () => { ctxSet(ck, id); toast(ck + ' set', 'ok'); } }, 'Use as ' + ck)));
+      Object.keys(ID_KEYS).forEach((rk) => { if (r[rk] && typeof r[rk] === 'string') useBtns.push(h('button', { class: 'btn sm ghost', onclick: () => { ctxSet(ID_KEYS[rk], r[rk]); toast(ID_KEYS[rk] + ' set', 'ok'); } }, 'Use ' + rk + ' as ' + ID_KEYS[rk])); });
+      det = h('tr', { class: 'detail' }, h('td', { colspan: keys.length + (o.onPick ? 1 : 0) }, kvView(r), useBtns.length ? h('div', { class: 'row', style: { marginTop: '10px' } }, useBtns) : null));
+      tr.after(det);
+      if (o.pickKeys && id && o.autoPick !== false) o.pickKeys.forEach((ck) => { if (ctxGet(ck) !== id) ctxSet(ck, id); });
+    });
+    body.appendChild(tr);
+  });
+  return h('div', { class: 'tw' }, tbl);
+}
+function jsonNode(data) {
+  const txt = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  const html = esc(txt).replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, (m) => {
+    let c = 'jn';
+    if (/^"/.test(m)) c = /:$/.test(m) ? 'jk' : 'js'; else if (/true|false|null/.test(m)) c = 'jb';
+    return '<span class="' + c + '">' + m + '</span>';
+  });
+  return h('pre', { class: 'json', html });
+}
+
+/* drawer and modal */
+function closeDrawer() { const d = $('#drawer'); if (d) { d.remove(); const s = $('#scrim'); if (s) s.remove(); } }
+function openDrawer(title, sub, bodyNode) {
+  closeDrawer();
+  const scrim = h('div', { class: 'scrim', id: 'scrim', onclick: closeDrawer });
+  const dr = h('div', { class: 'drawer', id: 'drawer' }, h('div', { class: 'dh' }, h('div', { style: { flex: 1, minWidth: 0 } }, h('h2', {}, title), sub || null), h('button', { class: 'iconbtn', onclick: closeDrawer, title: 'Close' }, ico('x'))), h('div', { class: 'db' }, bodyNode));
+  document.body.appendChild(scrim); document.body.appendChild(dr);
+  return dr;
+}
+function openModal(title, bodyNode) {
+  const m = h('div', { class: 'modal', onclick: (e) => { if (e.target === m) m.remove(); } }, h('div', { class: 'box' }, h('div', { class: 'mh' }, h('h3', { style: { flex: 1 } }, title), h('button', { class: 'iconbtn', onclick: () => m.remove() }, ico('x'))), h('div', { class: 'mb' }, bodyNode)));
+  document.body.appendChild(m);
+  return m;
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeDrawer(); const m = $('.modal'); if (m) m.remove(); } });
+
+/* form fields */
+function buildField(f) {
+  const lab = h('label', {}, f.label || f.key, f.required ? h('span', { class: 'req' }, '*') : null, f.bind && f.type !== 'hidden' ? h('span', { class: 'bind', title: 'Filled from the saved context' }, f.bind.replace('@', '')) : null);
+  let ctl, get;
+  const init = f.bind ? bindGet(f.bind) : '';
+  const def = init !== '' && init != null ? init : (f.value == null ? '' : f.value);
+  const wrap = h('div', { class: 'f' });
+  const hint = f.hint ? h('div', { class: 'hint' }, f.hint) : null;
+  switch (f.type) {
+    case 'hidden': return { node: null, get: () => f.value };
+    case 'group': {
+      const kids = (f.fields || []).map(buildField);
+      const node = h('div', { class: 'fgroup' }, h('div', { class: 'gl' }, f.label), kids.map((k) => k.node));
+      return { node, get: () => { const o = {}; (f.fields || []).forEach((cf, i) => { const v = kids[i].get(); if (v !== undefined) o[cf.key] = v; }); return Object.keys(o).length ? o : undefined; } };
+    }
+    case 'select': {
+      ctl = h('select', { class: 'fld' }, (f.options || []).map((o) => h('option', { value: o, selected: String(o) === String(def) }, o === '' ? '(none)' : o)));
+      get = () => (ctl.value === '' ? undefined : ctl.value); break;
+    }
+    case 'tri': {
+      ctl = h('select', { class: 'fld' }, h('option', { value: '' }, '(leave unchanged)'), h('option', { value: 'true', selected: f.value === true }, 'true'), h('option', { value: 'false' }, 'false'));
+      get = () => (ctl.value === '' ? undefined : ctl.value === 'true'); break;
+    }
+    case 'multi': {
+      const checks = (f.options || []).map((o) => h('input', { type: 'checkbox', value: o, checked: (f.value || []).includes(o) }));
+      ctl = h('div', { class: 'checks' }, (f.options || []).map((o, i) => h('label', {}, checks[i], o)));
+      get = () => { const v = checks.filter((c) => c.checked).map((c) => c.value); return v.length ? v : undefined; }; break;
+    }
+    case 'list': {
+      ctl = h('textarea', { class: 'fld', style: { minHeight: '56px' }, placeholder: 'One per line or comma separated' }, def || '');
+      get = () => { const v = ctl.value.split(/[\n,]+/).map((x) => x.trim()).filter(Boolean); return v.length ? v : undefined; }; break;
+    }
+    case 'textarea': ctl = h('textarea', { class: 'fld' }, def); get = () => (ctl.value === '' ? (f.required ? '' : undefined) : ctl.value); break;
+    case 'number': {
+      ctl = h('input', { class: 'fld', type: 'number', step: f.step || 'any', value: def });
+      get = () => (ctl.value === '' ? (f.required ? null : undefined) : Number(ctl.value)); break;
+    }
+    case 'date': ctl = h('input', { class: 'fld', type: 'date', value: String(def).slice(0, 10) }); get = () => (ctl.value || (f.required ? '' : undefined)); break;
+    case 'datetime': {
+      ctl = h('input', { class: 'fld', type: 'datetime-local', value: String(def).slice(0, 16) });
+      get = () => (ctl.value ? (ctl.value.length === 16 ? ctl.value + ':00' : ctl.value) : undefined); break;
+    }
+    default: {
+      ctl = h('input', { class: 'fld', type: f.type === 'email' ? 'email' : f.type === 'password' ? 'password' : 'text', value: def, autocomplete: 'off' });
+      get = () => (ctl.value === '' ? (f.required ? '' : undefined) : ctl.value.trim());
+    }
+  }
+  const ctlNode = ['text', 'email', 'list'].includes(f.type) ? withFinder(ctl, f.key, { bind: f.bind, multi: f.type === 'list' }) : ctl;
+  wrap.appendChild(lab); wrap.appendChild(ctlNode); if (hint) wrap.appendChild(hint);
+  return { node: wrap, get };
+}
+
+function curl(req) {
+  let s = "curl -X " + req.method + " '" + req.url + "'";
+  Object.keys(req.headers).forEach((k) => { s += " \\\n  -H '" + k + ': ' + req.headers[k] + "'"; });
+  if (req.body != null) s += " \\\n  -d '" + JSON.stringify(req.body) + "'";
+  return s;
+}
+
+function sessionSelect(ep, sel) {
+  const s = h('select', { class: 'fld', style: { maxWidth: '320px' } },
+    h('option', { value: 'auto' }, ep.role === 'public' ? 'No token needed' : 'Auto: ' + ((pickSession(ep.role) || {}).email || 'no session')),
+    state.sessions.map((x) => h('option', { value: x.id }, x.email + ' (' + roleLabel(x) + ')')));
+  if (sel) s.value = sel;
+  return s;
+}
+
+function renderResult(r, ep, host) {
+  host.innerHTML = '';
+  const cls = r.status === 0 ? 'bad' : r.status < 300 ? 'ok' : r.status < 500 ? 'warn' : 'bad';
+  host.appendChild(h('div', { class: 'resbar' }, h('span', { class: 'sc ' + cls }, r.status === 0 ? 'No response' : r.status), h('span', { class: 'muted small' }, r.ms + ' ms'), r.text ? h('span', { class: 'muted small' }, (r.text.length / 1024).toFixed(1) + ' KB') : null, h('span', { class: 'spacer' }), r.session ? h('span', { class: 'small muted' }, 'as ' + r.session.email) : h('span', { class: 'small muted' }, 'anonymous')));
+  const ex = explain(r);
+  if (ex) host.appendChild(h('div', { class: 'note ' + ex.kind }, ex.text));
+  const views = { Pretty: () => (r.data != null ? pretty(r.data, { pickKeys: PICK[ep.page], tiles: /Dashboard/.test(ep.page) }) : h('pre', { class: 'json' }, r.text || r.error || '(empty)')), JSON: () => jsonNode(r.data != null ? r.data : (r.text || r.error || '(empty)')), Request: () => h('pre', { class: 'json' }, curl(r.req)) };
+  const out = h('div', { class: 'card', style: { overflow: 'hidden' } });
+  const tabs = h('div', { class: 'tabs', style: { margin: '10px 0 8px' } });
+  const show = (name) => { [...tabs.children].forEach((b) => b.classList.toggle('on', b.textContent === name)); out.innerHTML = ''; out.appendChild(views[name]()); };
+  Object.keys(views).forEach((n) => tabs.appendChild(h('button', { onclick: () => show(n) }, n)));
+  host.appendChild(tabs); host.appendChild(out);
+  show(r.data != null && !r.ok ? 'JSON' : 'Pretty');
+  if (r.data != null) host.appendChild(h('div', { class: 'row', style: { marginTop: '8px' } }, h('button', { class: 'btn sm ghost', onclick: () => copyText(JSON.stringify(r.data, null, 2)) }, ico('copy', 14), 'Copy JSON')));
+}
+
+function captureFrom(ep, r) {
+  if (!r.ok || r.data == null) return [];
+  const got = [];
+  let d = r.data;
+  if (d.data && typeof d.data === 'object' && !Array.isArray(d.data) && d.id == null) d = d.data;
+  if (Array.isArray(d)) d = d[0] || {};
+  const id = d.id || d._id;
+  CAPTURE.forEach(([re, keys]) => { if (re.test(ep.name) && id) keys.forEach((k) => { ctxSet(k, id); got.push(k); }); });
+  ['paymentIntentId:payment_intent_id', 'orderId:paypal_order_id', 'txRef:tx_ref_flutterwave'].forEach((p) => { const [a, b] = p.split(':'); if (/^Deposit/.test(ep.name) && d[a]) { ctxSet(b, d[a]); got.push(b); } });
+  return got;
+}
+
+/* the endpoint runner */
+function openEndpoint(ep, opts) {
+  opts = opts || {};
+  const vals = {};
+  const root = h('div');
+  const pathLine = h('div', { class: 'pathline' });
+  const upd = () => { const p = resolvePath(ep.path, vals); pathLine.textContent = ep.method + '  ' + state.cfg[ep.svc] + p.path + qsPreview(); pathLine.style.color = p.missing.length ? 'var(--warn)' : ''; };
+  const qctl = {};
+  const qsPreview = () => { const q = []; Object.keys(qctl).forEach((k) => { const v = qctl[k].value; if (v) q.push(k + '=' + v); }); return q.length ? '?' + q.join('&') : ''; };
+
+  root.appendChild(h('div', { class: 'row' }, h('span', { class: 'badge m-' + ep.method }, ep.method), h('span', { class: 'badge role ' + ep.role }, ROLE_TXT[ep.role]), h('span', { class: 'small muted' }, ep.svc + ' service')));
+  root.appendChild(pathLine);
+  if (ep.desc) root.appendChild(mdNode(ep.desc));
+  if (ep.who && ep.role !== 'public') root.appendChild(h('div', { class: 'small muted', style: { margin: '4px 0 10px' } }, 'Who can call it: ', h('span', { html: md(ep.who) })));
+  if (ep.name === 'Check token') root.appendChild(h('div', { class: 'note info' }, 'This returns 404 unless the service runs with SYSTEM_TEST_TOKEN_ENABLED=true.'));
+
+  const sess = sessionSelect(ep);
+  if (ep.role !== 'public') root.appendChild(h('div', { class: 'f' }, h('label', {}, 'Send as'), sess));
+
+  if (ep.params.length) {
+    const g = h('div', { class: 'fgroup' }, h('div', { class: 'gl' }, 'Path values'));
+    ep.params.forEach((p) => {
+      const v0 = ctxGet(p.key); vals[p.key] = v0;
+      const inp = h('input', { class: 'fld', value: v0, placeholder: 'required', oninput: () => { vals[p.key] = inp.value.trim(); ctxSet(p.key, inp.value.trim()); upd(); } });
+      g.appendChild(h('div', { class: 'f' }, h('label', {}, label(p.key), h('span', { class: 'bind' }, p.key)), withFinder(inp, p.key)));
+    });
+    root.appendChild(g);
+  }
+  if (ep.query.length) {
+    const g = h('div', { class: 'fgroup' }, h('div', { class: 'gl' }, 'Query'));
+    ep.query.forEach((q) => {
+      const v0 = q.bind ? bindGet(q.bind) : '';
+      const val = v0 || q.value || '';
+      const c = q.options ? h('select', { class: 'fld', onchange: upd }, ['', ...q.options].map((o) => h('option', { value: o, selected: o === val }, o || '(any)'))) : h('input', { class: 'fld', type: q.type === 'date' ? 'date' : q.type === 'number' ? 'number' : 'text', value: val, oninput: upd });
+      qctl[q.key] = c;
+      g.appendChild(h('div', { class: 'f' }, h('label', {}, label(q.key), q.bind ? h('span', { class: 'bind' }, q.bind) : null), q.options ? c : withFinder(c, q.key, { bind: q.bind })));
+    });
+    root.appendChild(g);
+  }
+
+  let fields = [], raw = null, rawOn = false;
+  const bodyHost = h('div');
+  if (ep.body) {
+    (ep.body.fields || []).forEach((f) => {
+      if (f.bind === 'payment_reference' && !ctxGet('payment_reference')) ctxSet('payment_reference', genRef(/bill/i.test(ep.name) ? 'BILL' : 'RENT'));
+    });
+    fields = ep.body.fields.map(buildField);
+    if (opts.prefill) ep.body.fields.forEach((f, i) => { if (opts.prefill[f.key] != null && fields[i].node) { const c = fields[i].node.querySelector('input,select,textarea'); if (c) c.value = opts.prefill[f.key]; } });
+    const build = () => { const o = {}; ep.body.fields.forEach((f, i) => { const v = fields[i].get(); if (v !== undefined) o[f.key] = v; }); return o; };
+    root.buildBody = build;
+    const form = h('div', {}, fields.map((f) => f.node));
+    raw = h('textarea', { class: 'fld mono', style: { minHeight: '200px' } });
+    raw.style.display = 'none';
+    const tog = h('label', { class: 'small', style: { display: 'inline-flex', gap: '6px', alignItems: 'center', cursor: 'pointer' } }, h('input', { type: 'checkbox', onchange: (e) => { rawOn = e.target.checked; if (rawOn) raw.value = JSON.stringify(build(), null, 2); raw.style.display = rawOn ? '' : 'none'; form.style.display = rawOn ? 'none' : ''; } }), 'Edit the body as JSON');
+    bodyHost.appendChild(h('div', { class: 'row', style: { marginBottom: '8px' } }, h('div', { class: 'muted', style: { fontWeight: 600, fontSize: '12px' } }, 'Request body'), h('span', { class: 'spacer' }), tog));
+    bodyHost.appendChild(form); bodyHost.appendChild(raw);
+    (ep.body.notes || []).forEach((n) => bodyHost.appendChild(h('div', { class: 'small muted', style: { marginBottom: '4px' } }, plain(n).replace(/^\/\/\s*/, ''))));
+    root.appendChild(bodyHost);
+  }
+  upd();
+
+  const out = h('div', { style: { marginTop: '14px' } });
+  const btn = h('button', { class: 'btn' }, ico('play', 14), 'Send request');
+  const send = async () => {
+    const p = resolvePath(ep.path, vals);
+    if (p.missing.length) { toast('Missing path value: ' + p.missing.join(', '), 'err'); return; }
+    let body;
+    if (ep.body) {
+      if (rawOn) { try { body = JSON.parse(raw.value || '{}'); } catch (e) { toast('The JSON body is not valid: ' + e.message, 'err'); return; } } else body = root.buildBody();
+    }
+    const q = {}; Object.keys(qctl).forEach((k) => { q[k] = qctl[k].value; });
+    const session = pickSession(ep.role, sess.value);
+    if (ep.role !== 'public' && !session) { out.innerHTML = ''; out.appendChild(h('div', { class: 'note bad' }, 'No session. Sign in from Accounts first.')); return; }
+    btn.disabled = true; btn.textContent = 'Sending...';
+    const r = await call({ svc: ep.svc, method: ep.method, path: p.path, query: q, body, session: ep.role === 'public' ? null : session });
+    btn.disabled = false; btn.innerHTML = ''; btn.appendChild(ico('play', 14)); btn.appendChild(document.createTextNode('Send request'));
+    renderResult(r, ep, out);
+    if (r.ok) {
+      const got = captureFrom(ep, r);
+      if (got.length) out.insertBefore(h('div', { class: 'note ok' }, 'Saved to context: ' + got.join(', ')), out.children[1] || null);
+      if (ep.body && ep.body.fields.some((f) => f.bind === 'payment_reference') && ep.method === 'POST') { ctxSet('payment_reference', ''); }
+      if (ep.method !== 'GET') document.dispatchEvent(new CustomEvent('changed', { detail: ep }));
+    } else if (ep.body && ep.body.fields.some((f) => f.bind === 'payment_reference')) {
+      out.appendChild(h('div', { class: 'small muted', style: { marginTop: '8px' } }, 'The payment reference is kept, so sending again is a safe retry and cannot charge twice.'));
+    }
+  };
+  btn.addEventListener('click', send);
+  root.appendChild(h('div', { class: 'row', style: { marginTop: '4px' } }, btn, h('button', { class: 'btn ghost', onclick: () => { const p = resolvePath(ep.path, vals); const q = {}; Object.keys(qctl).forEach((k) => { q[k] = qctl[k].value; }); const s = pickSession(ep.role, sess.value); copyText(curl({ method: ep.method, url: buildUrl(ep.svc, p.path, q), headers: s ? { Authorization: 'Bearer ' + s.token } : {}, body: ep.body && !rawOn ? root.buildBody() : undefined })); } }, ico('copy', 14), 'Copy as curl')));
+  root.appendChild(out);
+  openDrawer(ep.name, null, root);
+  return root;
+}
+
+function actCard(ep) {
+  const p = ep.path.replace(/\{\{(\w+)\}\}/g, ':$1');
+  return h('button', { class: 'act', onclick: () => openEndpoint(ep) }, h('div', { class: 'nm' }, ep.name), h('div', { class: 'pt' }, p), h('div', { class: 'tg' }, h('span', { class: 'badge m-' + ep.method }, ep.method), h('span', { class: 'badge role ' + ep.role }, ROLE_TXT[ep.role])));
+}
+function actGrid(list) { return h('div', { class: 'acts' }, list.map(actCard)); }
+
+/* ---------- pages, shell, boot ---------- */
+const HEALTH = { auth: '/health', property: '/system/health', wallet: '/system/health' };
+const SVC_NAME = { auth: 'Auth', property: 'Property', wallet: 'Wallet' };
+const PAGE_ICON = { Owners: 'user', Tenants: 'users', Properties: 'building', 'Rental Units': 'door', Leases: 'file', Occupancy: 'key', 'Rent Payments': 'coins', 'Security Deposits': 'shield', 'Meter Readings': 'gauge', 'Utility Bills': 'bolt', Maintenance: 'wrench', 'Work Orders': 'clip', Inspections: 'search', Notices: 'bell', 'Blacklisted Tenants': 'ban', 'Dashboard and reports': 'chart', System: 'pulse' };
+const PRIMARY = {
+  Owners: ['Get my owner profile'], Tenants: ['Get my tenant profile'], Properties: ['List my properties'], 'Rental Units': ['List units in a property'],
+  Leases: ['List my leases as owner'], Occupancy: ['List occupancy history of a property'], 'Rent Payments': ['List rent payments on a lease'],
+  'Security Deposits': ['Get deposit on a lease'], 'Meter Readings': ['List meter readings of a unit'], 'Utility Bills': ['List bills of a unit', 'List outstanding bills of a tenant'],
+  Maintenance: ['List maintenance requests by status'], 'Work Orders': ['List work orders by status'], Inspections: ['List my inspections by status'],
+  Notices: ['List my bulk notices'], 'Blacklisted Tenants': ['List blacklisted tenants'], 'Dashboard and reports': ['Get owner dashboard', 'Get occupancy report'], System: ['Check health', 'Check dependency status'],
+};
+const MAIN_CTX = ['owner_id', 'tenant_id', 'property_id', 'unit_id', 'lease_id', 'payment_reference'];
+const ALL_CTX = (() => { const s = new Set(); ALL.forEach((e) => { e.params.forEach((p) => s.add(p.key)); (e.body ? e.body.fields : []).forEach((f) => { if (f.bind && f.bind[0] !== '@') s.add(f.bind); }); e.query.forEach((q) => { if (q.bind) s.add(q.bind); }); }); ['owner_id', 'tenant_id', 'property_id', 'unit_id', 'lease_id', 'payment_reference'].forEach((k) => s.add(k)); s.delete('rental_unit_id'); s.delete('maintenance_request_id'); return [...s].sort(); })();
+
+let pageSubs = [];
+function onPage(evt, fn) { document.addEventListener(evt, fn); pageSubs.push([evt, fn]); }
+function clearPageSubs() { pageSubs.forEach(([e, f]) => document.removeEventListener(e, f)); pageSubs = []; }
+
+function pageHead(eyebrow, title, note, right) {
+  return h('div', { class: 'ph' }, h('div', { class: 'grow' }, h('div', { class: 'eyebrow' }, eyebrow), h('h1', {}, title), note ? mdNode(note, 'p') : null), right || null);
+}
+function spinner(t) { return h('div', { class: 'empty' }, h('span', { class: 'spin' }), ' ', t || 'Loading...'); }
+const findNum = (d, keys) => { if (d == null || typeof d !== 'object') return null; for (const k of keys) if (typeof d[k] === 'number') return d[k]; if (d.data && typeof d.data === 'object') return findNum(d.data, keys); return null; };
+const findStr = (d, keys) => { if (d == null || typeof d !== 'object') return null; for (const k of keys) if (typeof d[k] === 'string') return d[k]; if (d.data && typeof d.data === 'object') return findStr(d.data, keys); return null; };
+const epByName = (n) => ALL.find((e) => e.name === n);
+const go = (slug) => { if (location.hash === '#/' + slug) route(); else location.hash = '#/' + slug; };
+
+/* ---------- list card ---------- */
+function listCard(ep, pageName, opts) {
+  opts = opts || {};
+  const vals = {}; const inputs = {}; const qctl = {};
+  const bd = h('div', { class: 'bd flush' });
+  const ctrls = h('div', { class: 'row' });
+  ep.params.forEach((p) => {
+    vals[p.key] = ctxGet(p.key);
+    const i = h('input', { class: 'fld', style: { width: '180px' }, placeholder: p.key, title: p.key, value: vals[p.key], onchange: () => { vals[p.key] = i.value.trim(); ctxSet(p.key, vals[p.key]); } });
+    inputs[p.key] = i; ctrls.appendChild(withFinder(i, p.key));
+  });
+  ep.query.forEach((q) => {
+    const v = (q.bind ? bindGet(q.bind) : '') || q.value || '';
+    const c = q.options ? h('select', { class: 'fld', style: { width: '140px' }, onchange: () => load() }, q.options.map((o) => h('option', { value: o, selected: o === v }, o))) : h('input', { class: 'fld', style: { width: '140px' }, type: q.type === 'date' ? 'date' : 'text', placeholder: q.key, value: v, onchange: () => load() });
+    qctl[q.key] = c; ctrls.appendChild(c);
+  });
+  const card = h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h3', {}, opts.title || ep.name), h('span', { class: 'badge role ' + ep.role }, ROLE_TXT[ep.role]), h('span', { class: 'spacer' }), ctrls, h('button', { class: 'btn sm ghost', onclick: () => load() }, ico('refresh', 14), 'Refresh'), h('button', { class: 'btn sm ghost', onclick: () => openEndpoint(ep) }, 'Open')), bd);
+  async function load() {
+    ep.params.forEach((p) => { vals[p.key] = inputs[p.key].value.trim(); });
+    const p = resolvePath(ep.path, vals);
+    if (p.missing.length) { bd.innerHTML = ''; bd.appendChild(h('div', { class: 'empty' }, 'This view needs ' + p.missing.join(', ') + '. ' + (opts.hint || 'Pick a row in the matching section, or type the id above.'))); return; }
+    const session = pickSession(ep.role);
+    if (ep.role !== 'public' && !session) { bd.innerHTML = ''; bd.appendChild(h('div', { class: 'empty' }, 'Sign in first.')); return; }
+    bd.innerHTML = ''; bd.appendChild(spinner());
+    const q = {}; Object.keys(qctl).forEach((k) => { q[k] = qctl[k].value; });
+    const r = await call({ svc: ep.svc, method: ep.method, path: p.path, query: q, session: ep.role === 'public' ? null : session });
+    bd.innerHTML = '';
+    if (!r.ok) {
+      const ex = explain(r);
+      bd.appendChild(h('div', { style: { padding: '12px 16px' } }, h('div', { class: 'note bad' }, ex ? ex.text : 'Failed'), r.status === 404 && /profile/.test(ep.name) ? h('div', { class: 'small muted' }, 'There is no profile yet. Use one of the create actions below.') : null));
+      return;
+    }
+    const got = captureFrom(ep, r);
+    bd.appendChild(pretty(r.data, { pickKeys: ep.name.includes('bulk') ? ['scheduled_notice_id'] : PICK[pageName], tiles: /Dashboard/.test(pageName), flush: true }));
+    if (got.length) bd.appendChild(h('div', { class: 'small muted', style: { padding: '8px 16px' } }, 'Saved to context: ' + got.join(', ')));
+  }
+  onPage('changed', () => load());
+  onPage('ctx', () => { ep.params.forEach((p) => { if (document.activeElement !== inputs[p.key]) { const v = ctxGet(p.key); if (inputs[p.key].value !== v) inputs[p.key].value = v; } }); });
+  setTimeout(load, 0);
+  return card;
+}
+
+/* ---------- wallet helpers ---------- */
+async function fetchBalance() {
+  const s = activeSession();
+  if (!s) return { err: 'Sign in first.' };
+  const r = await call({ svc: 'wallet', method: 'GET', path: '/wallet/balance', session: s, quiet: true });
+  if (!r.ok) return { err: (explain(r) || {}).text || 'Could not read the wallet', status: r.status, r };
+  const n = findNum(r.data, ['availableBalance', 'balance', 'amount', 'available']);
+  return { n, cur: findStr(r.data, ['currency']) || 'USD', data: r.data };
+}
+
+function rentDesk() {
+  const balV = h('div', { class: 'v' }, '...'); const balSub = h('div', { class: 'small muted' });
+  const dueV = h('div', { class: 'v' }, '-'); const dueSub = h('div', { class: 'small muted' });
+  const lease = h('input', { class: 'fld', value: ctxGet('lease_id'), placeholder: 'lease id', onchange: () => ctxSet('lease_id', lease.value.trim()) });
+  const amount = h('input', { class: 'fld', type: 'number', step: '0.01', placeholder: '0.00' });
+  const ref = h('input', { class: 'fld mono', value: ctxGet('payment_reference') });
+  const out = h('div');
+  const ensureRef = () => { if (!ref.value) { ref.value = genRef('RENT'); ctxSet('payment_reference', ref.value); } };
+  ensureRef();
+  async function loadBal() {
+    balV.textContent = '...'; balSub.textContent = '';
+    const b = await fetchBalance();
+    if (b.err) { balV.textContent = '-'; balSub.textContent = b.status === 404 ? 'No wallet yet. Create one in Wallet.' : b.err; return b; }
+    balV.textContent = b.n == null ? '?' : money(b.n); balSub.textContent = b.cur; return b;
+  }
+  async function checkDue() {
+    const id = lease.value.trim(); if (!id) { toast('Enter a lease id', 'err'); return; }
+    ctxSet('lease_id', id);
+    dueV.textContent = '...';
+    const r = await call({ svc: 'property', method: 'GET', path: '/api/v1/rent/due/' + encodeURIComponent(id), session: pickSession('any') });
+    out.innerHTML = '';
+    if (!r.ok) { dueV.textContent = '-'; out.appendChild(h('div', { class: 'note bad' }, (explain(r) || {}).text || 'Failed')); return; }
+    const n = findNum(r.data, ['amountDue', 'totalDue', 'dueAmount', 'rentDue', 'totalAmountDue', 'outstanding', 'balance', 'amount']);
+    dueV.textContent = n == null ? 'see below' : money(n); dueSub.textContent = findStr(r.data, ['dueDate', 'nextDueDate']) || '';
+    if (n != null && n > 0) amount.value = n;
+    out.appendChild(h('div', { class: 'card', style: { overflow: 'hidden' } }, pretty(r.data, { flush: true })));
+  }
+  async function pay() {
+    const id = lease.value.trim(); const a = Number(amount.value);
+    if (!id || !(a > 0)) { toast('Enter a lease id and an amount', 'err'); return; }
+    ensureRef(); ctxSet('lease_id', id); ctxSet('payment_reference', ref.value.trim());
+    payBtn.disabled = true;
+    const body = { leaseId: id, amount: a, paymentMethod: 'WALLET', reference: ref.value.trim() };
+    const r = await call({ svc: 'property', method: 'POST', path: '/api/v1/rent/pay', body, session: pickSession('any') });
+    payBtn.disabled = false; out.innerHTML = '';
+    if (r.ok) {
+      ctxSet('payment_reference', ''); ref.value = ''; ensureRef();
+      out.appendChild(h('div', { class: 'receipt' }, h('h3', {}, 'Payment received'), h('div', { class: 'small muted', style: { margin: '2px 0 10px' } }, money(a) + ' paid from the wallet on lease ' + id.slice(0, 8) + '...'), r.data && typeof r.data === 'object' ? kvView(r.data) : null));
+      loadBal(); checkDueQuiet();
+      document.dispatchEvent(new CustomEvent('changed', { detail: { name: 'Pay rent' } }));
+    } else {
+      const ex = explain(r); const msg = JSON.stringify(r.data || '');
+      out.appendChild(h('div', { class: 'note bad' }, ex ? ex.text : 'Failed'));
+      if (/insufficient|balance|fund/i.test(msg)) out.appendChild(h('div', { class: 'note info' }, 'The wallet looks short. Top it up, then press Pay again: the same reference is reused so it cannot double charge.', ' ', h('a', { href: '#/wallet' }, 'Open the wallet')));
+      else out.appendChild(h('div', { class: 'small muted' }, 'The reference is kept, so pressing Pay again is a safe retry.'));
+    }
+  }
+  async function checkDueQuiet() { if (lease.value.trim()) { const r = await call({ svc: 'property', method: 'GET', path: '/api/v1/rent/due/' + encodeURIComponent(lease.value.trim()), session: pickSession('any'), quiet: true }); if (r.ok) { const n = findNum(r.data, ['amountDue', 'totalDue', 'dueAmount', 'rentDue', 'totalAmountDue', 'outstanding', 'balance', 'amount']); dueV.textContent = n == null ? 'see below' : money(n); } } }
+  const payBtn = h('button', { class: 'btn brass' }, ico('coins', 15), 'Pay from wallet');
+  payBtn.addEventListener('click', pay);
+  const card = h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h3', {}, 'Rent desk'), h('span', { class: 'sub' }, 'Pays from the signed in tenant\'s wallet, USD only'), h('span', { class: 'spacer' }), h('button', { class: 'btn sm ghost', onclick: loadBal }, ico('refresh', 14), 'Balance')),
+    h('div', { class: 'bd' },
+      h('div', { class: 'tiles' }, h('div', { class: 'tile gold' }, h('div', { class: 'l' }, 'Wallet balance'), balV, balSub), h('div', { class: 'tile' }, h('div', { class: 'l' }, 'Rent due'), dueV, dueSub)),
+      h('div', { class: 'cols2' }, h('div', { class: 'f' }, h('label', {}, 'Lease id', h('span', { class: 'bind' }, 'lease_id')), withFinder(lease, 'lease_id')), h('div', { class: 'f' }, h('label', {}, 'Amount (USD)'), amount)),
+      h('div', { class: 'f' }, h('label', {}, 'Payment reference', h('span', { class: 'bind' }, 'payment_reference')), h('div', { class: 'row' }, h('div', { style: { flex: 1 } }, ref), h('button', { class: 'btn sm ghost', onclick: () => { ref.value = genRef('RENT'); ctxSet('payment_reference', ref.value); } }, 'New reference')), h('div', { class: 'hint' }, 'Reusing a reference is how a retry stays safe. It is cleared after a successful payment.')),
+      h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: checkDue }, 'Check rent due'), payBtn, h('a', { class: 'btn ghost', href: '#/wallet', style: { textDecoration: 'none' } }, 'Top up wallet')),
+      out));
+  setTimeout(() => { loadBal(); if (lease.value) checkDueQuiet(); }, 0);
+  onPage('ctx', () => { if (document.activeElement !== lease) lease.value = ctxGet('lease_id'); });
+  return card;
+}
+
+/* ---------- pages ---------- */
+function propertyPage(pg) {
+  const eps = PAGE_EP[pg.name] || [];
+  const root = h('div', { class: 'stack' });
+  root.appendChild(pageHead('Property service', pg.name, pg.note));
+  if (pg.name === 'Rent Payments') root.appendChild(rentDesk());
+  (PRIMARY[pg.name] || []).forEach((n) => { const e = eps.find((x) => x.name === n); if (e) root.appendChild(listCard(e, pg.name, { hint: pg.name === 'Rental Units' ? 'Pick a property in Properties first.' : null })); });
+  const reads = eps.filter((e) => e.method === 'GET'); const writes = eps.filter((e) => e.method !== 'GET');
+  if (writes.length) root.appendChild(h('div', {}, h('div', { class: 'grp' }, 'Create and change'), actGrid(writes)));
+  if (reads.length) root.appendChild(h('div', {}, h('div', { class: 'grp' }, 'Read'), actGrid(reads)));
+  return root;
+}
+
+function walletPage() {
+  const root = h('div', { class: 'stack' });
+  const bal = h('div', { class: 'v' }, '...'); const cur = h('div', { class: 'small muted' });
+  const stat = h('div', { class: 'v', style: { fontSize: '20px' } }, '-'); const acct = h('div', { class: 'small muted' });
+  const note = h('div');
+  async function load() {
+    note.innerHTML = '';
+    const b = await fetchBalance();
+    if (b.err) { bal.textContent = '-'; cur.textContent = ''; note.appendChild(h('div', { class: 'note ' + (b.status === 404 ? 'info' : 'bad') }, b.status === 404 ? 'This user has no wallet yet. Use Create wallet below.' : b.err)); return; }
+    bal.textContent = b.n == null ? '?' : money(b.n); cur.textContent = b.cur;
+    const d = await call({ svc: 'wallet', method: 'GET', path: '/wallet', session: activeSession(), quiet: true });
+    if (d.ok) { stat.innerHTML = ''; const s = findStr(d.data, ['status', 'walletStatus']); stat.appendChild(s ? h('span', { class: 'pill ' + statusClass(s) }, s) : document.createTextNode('ok')); acct.textContent = findStr(d.data, ['accountNumber', 'account']) || ''; }
+  }
+  root.appendChild(pageHead('Wallet service', 'Wallet', 'Rent and bills are paid from the signed in user\'s wallet. Check the balance, create a wallet, add money, or move it. Admins can credit any wallet to give a test tenant funds.', h('button', { class: 'btn ghost', onclick: load }, ico('refresh', 14), 'Refresh')));
+  root.appendChild(h('div', { class: 'tiles' }, h('div', { class: 'tile gold' }, h('div', { class: 'l' }, 'Available balance'), bal, cur), h('div', { class: 'tile' }, h('div', { class: 'l' }, 'Wallet status'), stat, acct)));
+  root.appendChild(note);
+  const groups = []; (PAGE_EP.Wallet || []).forEach((e) => { let g = groups.find((x) => x.n === e.group); if (!g) groups.push(g = { n: e.group, l: [] }); g.l.push(e); });
+  groups.forEach((g) => root.appendChild(h('div', {}, h('div', { class: 'grp' }, g.n), actGrid(g.l))));
+  onPage('changed', load);
+  setTimeout(load, 0);
+  return root;
+}
+
+/* sign in */
+function signinForm(onDone, compact) {
+  const email = h('input', { class: 'fld', type: 'email', placeholder: 'you@example.com', autocomplete: 'username' });
+  const pw = h('input', { class: 'fld', type: 'password', placeholder: 'Password', autocomplete: 'current-password' });
+  const out = h('div'); const btn = h('button', { class: 'btn', type: 'submit' }, 'Sign in');
+  const form = h('form', { onsubmit: async (e) => {
+    e.preventDefault();
+    if (!email.value || !pw.value) { toast('Enter an email and password', 'err'); return; }
+    btn.disabled = true; btn.textContent = 'Signing in...'; out.innerHTML = '';
+    const r = await call({ svc: 'auth', method: 'POST', path: '/auth/signin', body: { email: email.value.trim(), password: pw.value }, session: null });
+    btn.disabled = false; btn.textContent = 'Sign in';
+    if (r.ok && r.data && (r.data.token || r.data.accessToken)) { const s = addSession(r.data, email.value.trim()); pw.value = ''; toast('Signed in as ' + s.email, 'ok'); onDone && onDone(s); }
+    else { const ex = explain(r); out.appendChild(h('div', { class: 'note bad' }, ex ? ex.text : 'The service answered without a token. Open the log to see the response.')); if (r.data) out.appendChild(jsonNode(r.data)); }
+  } });
+  const presets = h('div', { class: 'preset' }, state.presets.map((p) => h('button', { type: 'button', onclick: () => { email.value = p.email; pw.value = p.password || ''; } }, p.label)));
+  form.appendChild(state.presets.length ? presets : h('span'));
+  form.appendChild(h('div', { class: 'f' }, h('label', {}, 'Email'), email)); form.appendChild(h('div', { class: 'f' }, h('label', {}, 'Password'), pw));
+  form.appendChild(h('div', { class: 'row' }, btn)); form.appendChild(out);
+  return form;
+}
+function connectionForm(onSave) {
+  const ins = {}; const box = h('div');
+  ['auth', 'property', 'wallet'].forEach((k) => { ins[k] = h('input', { class: 'fld', value: state.cfg[k] }); box.appendChild(h('div', { class: 'f' }, h('label', {}, SVC_NAME[k] + ' service base URL'), ins[k])); });
+  box.appendChild(h('div', { class: 'row' }, h('button', { class: 'btn sm', type: 'button', onclick: () => { Object.keys(ins).forEach((k) => { state.cfg[k] = ins[k].value.trim().replace(/\/+$/, ''); }); store.set('cfg', state.cfg); toast('Saved', 'ok'); pingAll(); onSave && onSave(); } }, 'Save'), h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { Object.assign(state.cfg, DEFAULT_CFG); store.set('cfg', state.cfg); Object.keys(ins).forEach((k) => { ins[k].value = state.cfg[k]; }); pingAll(); } }, 'Defaults')));
+  return box;
+}
+function importEnvBtn() {
+  const f = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' }, onchange: () => {
+    const file = f.files[0]; if (!file) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const j = JSON.parse(rd.result); const v = {}; (j.values || []).forEach((x) => { v[x.key] = x.value; });
+        if (v.base_url) state.cfg.auth = v.base_url; if (v.base_url_property) state.cfg.property = v.base_url_property; if (v.base_url_wallet) state.cfg.wallet = v.base_url_wallet;
+        store.set('cfg', state.cfg);
+        const pr = [];
+        ['admin', 'operations', 'finance', 'support', 'home_owner', 'client'].forEach((r) => { if (v[r + '_email']) pr.push({ label: r.replace('_', ' '), email: v[r + '_email'], password: v[r + '_password'] || '' }); });
+        if (!pr.length && v.email) pr.push({ label: 'default', email: v.email, password: v.password || '' });
+        state.presets = pr; store.set('presets', pr);
+        ['owner_id', 'tenant_id', 'property_id', 'unit_id', 'lease_id', 'maintenance_id', 'work_order_id', 'inspection_id', 'notice_id', 'scheduled_notice_id', 'meter_reading_id', 'bill_id', 'deposit_id'].forEach((k) => { if (v[k]) ctxSet(k, v[k]); });
+        toast('Imported ' + pr.length + ' sign-in presets and the service URLs', 'ok'); pingAll(); route(); renderApp();
+      } catch (e) { toast('That file is not a Postman environment', 'err'); }
+    };
+    rd.readAsText(file);
+  } });
+  return h('span', {}, f, h('button', { class: 'btn sm ghost', type: 'button', onclick: () => f.click() }, 'Import Postman environment'));
+}
+function signinScreen() {
+  const form = h('div', { class: 'form' },
+    h('div', { class: 'wordmark' }, h('div', { class: 'crest' }, ico('home', 16)), h('div', {}, h('b', {}, 'Premisave Console'), h('div', { class: 'small muted' }, 'Sign in with your Premisave account'))),
+    signinForm(() => { go('overview'); renderApp(); route(); }),
+    h('details', { style: { marginTop: '18px' } }, h('summary', { style: { cursor: 'pointer', fontWeight: 500, fontSize: '12.5px', color: 'var(--muted)' } }, 'Connection settings'), h('div', { style: { marginTop: '10px' } }, connectionForm(), h('div', { style: { marginTop: '10px' } }, importEnvBtn()))),
+    h('div', { style: { marginTop: '14px' } }, h('a', { href: '#', class: 'small', onclick: (e) => { e.preventDefault(); state.guest = true; renderApp(); route(); } }, 'Continue without signing in')));
+  return h('div', { style: { minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '24px', background: 'var(--bg)' } }, h('div', { class: 'signin', style: { width: '100%' } }, form));
+}
+
+function expIn(s) { const m = Math.round((s.exp - Date.now()) / 60000); return m < 0 ? 'expired' : m < 1 ? 'under a minute' : m + ' min'; }
+function accountsPage() {
+  const root = h('div', { class: 'stack' });
+  root.appendChild(pageHead('Auth service', 'Accounts', 'Sign in as different roles and switch between them. Owner endpoints use a home owner session, admin endpoints an admin session, and everything else the active one. Tokens refresh themselves shortly before they expire.'));
+  const list = h('div');
+  const draw = () => {
+    list.innerHTML = '';
+    if (!state.sessions.length) list.appendChild(h('div', { class: 'empty' }, 'No sessions yet. Sign in below.'));
+    state.sessions.forEach((s) => {
+      const on = (activeSession() || {}).id === s.id;
+      list.appendChild(h('div', { class: 'sess' + (on ? ' on' : '') }, h('div', { class: 'av' }, (s.email || '?')[0].toUpperCase()), h('div', { style: { flex: 1, minWidth: 0 } }, h('div', { style: { fontWeight: 600, wordBreak: 'break-all' } }, s.email), h('div', { class: 'small muted' }, roleLabel(s) + ' - token ' + (s.exp < Date.now() ? 'expired' : 'valid for ' + expIn(s)))),
+        h('div', { class: 'row' }, on ? h('span', { class: 'pill ok' }, 'active') : h('button', { class: 'btn sm ghost', onclick: () => { state.active = s.id; persistSessions(); document.dispatchEvent(new CustomEvent('sess')); draw(); } }, 'Use'),
+          h('button', { class: 'btn sm ghost', onclick: async () => { const ok = await refreshSession(s); toast(ok ? 'Token refreshed' : 'Refresh failed, sign in again', ok ? 'ok' : 'err'); draw(); } }, 'Refresh'),
+          h('button', { class: 'btn sm ghost', onclick: () => copyText(s.token) }, 'Copy token'),
+          h('button', { class: 'btn sm ghost', onclick: () => { const c = jwt(s.token); openModal('Token claims', c ? jsonNode(c) : h('p', {}, 'Not a readable JWT.')); } }, 'Claims'),
+          h('button', { class: 'btn sm danger', onclick: async () => { call({ svc: 'auth', method: 'POST', path: '/auth/logout', session: s, quiet: true }); dropSession(s.id); document.dispatchEvent(new CustomEvent('sess')); draw(); if (!state.sessions.length) renderApp(); } }, 'Sign out'))));
+    });
+  };
+  draw(); onPage('sess', draw);
+  root.appendChild(h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h3', {}, 'Sessions'), h('span', { class: 'sub' }, 'Stored in this browser only')), h('div', { class: 'bd flush' }, list)));
+  root.appendChild(h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h3', {}, 'Add a session')), h('div', { class: 'bd' }, signinForm(() => draw()))));
+  const groups = []; (PAGE_EP.Accounts || []).forEach((e) => { let g = groups.find((x) => x.n === e.group); if (!g) groups.push(g = { n: e.group, l: [] }); g.l.push(e); });
+  groups.forEach((g) => root.appendChild(h('div', {}, h('div', { class: 'grp' }, g.n), actGrid(g.l))));
+  return root;
+}
+
+function overviewPage() {
+  const root = h('div', { class: 'stack' });
+  const s = activeSession();
+  root.appendChild(pageHead('Premisave', 'Overview', 'A test console for the Property service. Work top to bottom through the walkthrough, or open any section from the left.'));
+  const svcTiles = h('div', { class: 'tiles' });
+  const drawSvc = () => { svcTiles.innerHTML = ''; ['auth', 'property', 'wallet'].forEach((k) => { const hh = state.health[k]; svcTiles.appendChild(h('div', { class: 'tile', style: { cursor: 'pointer' }, onclick: () => pingAll() }, h('div', { class: 'l' }, SVC_NAME[k] + ' service'), h('div', { class: 'v', style: { fontSize: '20px' } }, hh ? (hh.status > 0 && hh.status < 300 ? 'Online' : hh.status === 0 ? 'Unreachable' : 'HTTP ' + hh.status) : 'Checking...'), h('div', { class: 'small muted mono' }, state.cfg[k]))); }); svcTiles.appendChild(h('div', { class: 'tile gold' }, h('div', { class: 'l' }, 'Signed in as'), h('div', { class: 'v', style: { fontSize: '18px', wordBreak: 'break-all' } }, s ? s.email : 'nobody'), h('div', { class: 'small' }, s ? roleLabel(s) : ''))); };
+  drawSvc(); onPage('health', drawSvc);
+  root.appendChild(svcTiles);
+  const hasRole = (re) => state.sessions.some((x) => x.roles.some((r) => re.test(r)));
+  const steps = [
+    ['Sign in as a home owner', 'Owner endpoints need a session with the HOME_OWNER role.', hasRole(/^HOME_OWNER$/), 'accounts'],
+    ['Create the owner profile', 'Use "Create owner profile from my account". It saves owner_id.', !!state.ctx.owner_id, 'owners'],
+    ['Create a property', 'Saves property_id.', !!state.ctx.property_id, 'properties'],
+    ['Add a rental unit', 'Saves unit_id.', !!state.ctx.unit_id, 'rental-units'],
+    ['Create the tenant profile', 'Sign in as the tenant (a client account), then create the profile. It saves tenant_id.', !!state.ctx.tenant_id, 'tenants'],
+    ['Create a lease', 'Switch back to the owner. Saves lease_id.', !!state.ctx.lease_id, 'leases'],
+    ['Fund the tenant wallet', 'An admin can credit the wallet, or the tenant can deposit.', false, 'wallet'],
+    ['Pay rent from the wallet', 'Use the Rent desk as the tenant.', false, 'rent-payments'],
+  ];
+  const list = h('div', { class: 'steps' });
+  steps.forEach((st, i) => list.appendChild(h('div', { class: 'step' + (st[2] ? ' done' : '') }, h('div', { class: 'no' }, st[2] ? ico('check', 14) : String(i + 1)), h('div', { class: 'tx' }, h('b', {}, st[0]), h('span', {}, st[1])), h('button', { class: 'btn sm ghost', onclick: () => go(st[3]) }, 'Open'))));
+  root.appendChild(h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h3', {}, 'Walkthrough'), h('span', { class: 'sub' }, 'A full rent cycle in eight steps')), h('div', { class: 'bd' }, list)));
+  const grid = h('div', { class: 'acts' }, SPEC.pages.map((p) => h('button', { class: 'act', onclick: () => go(p.slug) }, h('div', { class: 'row' }, ico(PAGE_ICON[p.name] || 'list'), h('div', { class: 'nm' }, p.name)), h('div', { class: 'small muted' }, (PAGE_EP[p.name] || []).length + ' endpoints'))));
+  root.appendChild(h('div', {}, h('div', { class: 'grp' }, 'Property service sections'), grid));
+  return root;
+}
+
+function allPage() {
+  const root = h('div', { class: 'stack' });
+  const q = h('input', { class: 'fld', placeholder: 'Search by name or path', style: { maxWidth: '320px' } });
+  const svc = h('select', { class: 'fld', style: { width: '150px' } }, ['all services', 'property', 'auth', 'wallet'].map((x) => h('option', { value: x }, x)));
+  const meth = h('select', { class: 'fld', style: { width: '130px' } }, ['all methods', 'GET', 'POST', 'PATCH', 'PUT', 'DELETE'].map((x) => h('option', { value: x }, x)));
+  const host = h('div'); const cnt = h('span', { class: 'muted small' });
+  const draw = () => {
+    const t = q.value.toLowerCase();
+    const l = ALL.filter((e) => (svc.value === 'all services' || e.svc === svc.value) && (meth.value === 'all methods' || e.method === meth.value) && (!t || (e.name + ' ' + e.path).toLowerCase().includes(t)));
+    host.innerHTML = ''; host.appendChild(actGrid(l)); cnt.textContent = l.length + ' of ' + ALL.length;
+  };
+  [q, svc, meth].forEach((c) => c.addEventListener('input', draw));
+  root.appendChild(pageHead('Reference', 'All endpoints', 'Every endpoint the console knows, across the three services. Open one to fill in the form and send it.', h('div', { class: 'row' }, q, svc, meth, cnt)));
+  root.appendChild(host); draw();
+  return root;
+}
+
+function smokePage() {
+  const root = h('div', { class: 'stack' });
+  const body = h('tbody'); const sum = h('div', { class: 'tiles' }); let running = false;
+  const hasAdmin = state.sessions.some((x) => x.roles.some((r) => /ADMIN/.test(r)));
+  const btn = h('button', { class: 'btn' }, ico('play', 14), 'Run read-only checks');
+  btn.addEventListener('click', async () => {
+    if (running) return; running = true; btn.disabled = true; body.innerHTML = ''; sum.innerHTML = '';
+    const list = ALL.filter((e) => e.method === 'GET' && !/test-token/.test(e.path) && e.params.every((p) => ctxGet(p.key)) && (e.role !== 'admin' || hasAdmin) && (e.role === 'public' || activeSession()));
+    let ok = 0, warn = 0, bad = 0;
+    for (const e of list) {
+      const p = resolvePath(e.path, {}); const q = {}; e.query.forEach((x) => { q[x.key] = (x.bind ? bindGet(x.bind) : '') || x.value || ''; });
+      const r = await call({ svc: e.svc, method: 'GET', path: p.path, query: q, session: e.role === 'public' ? null : pickSession(e.role), quiet: true });
+      const cls = r.status === 0 || r.status >= 500 || r.status === 401 || r.status === 403 ? 'bad' : r.status >= 400 ? 'warn' : 'ok';
+      if (cls === 'ok') ok++; else if (cls === 'warn') warn++; else bad++;
+      body.appendChild(h('tr', {}, h('td', {}, e.name), h('td', {}, h('span', { class: 'badge role' }, e.svc)), h('td', { class: 'mono small' }, e.path.replace(/\{\{(\w+)\}\}/g, ':$1')), h('td', {}, h('span', { class: 'pill ' + cls }, r.status || 'no response')), h('td', { class: 'num' }, r.ms + ' ms')));
+    }
+    sum.innerHTML = ''; [['Passed', ok, ''], ['Not found or invalid', warn, ''], ['Failed', bad, '']].forEach(([l, v]) => sum.appendChild(h('div', { class: 'tile' + (l === 'Passed' ? ' gold' : '') }, h('div', { class: 'l' }, l), h('div', { class: 'v' }, String(v)))));
+    running = false; btn.disabled = false;
+  });
+  root.appendChild(pageHead('Tools', 'Smoke test', 'Calls every read-only endpoint that has the ids it needs, one after another, and reports the status. A 404 usually means an id in the context does not exist. A 401 or 403 means the active session has the wrong role. Admin endpoints only run when an admin session is signed in.', btn));
+  root.appendChild(sum);
+  root.appendChild(h('div', { class: 'card' }, h('div', { class: 'bd flush' }, h('div', { class: 'tw' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, ['Endpoint', 'Service', 'Path', 'Status', 'Time'].map((x) => h('th', {}, x)))), body)))));
+  return root;
+}
+
+function logPage() {
+  const root = h('div', { class: 'stack' }); const host = h('div', { class: 'bd flush' });
+  const draw = () => {
+    host.innerHTML = '';
+    if (!state.log.length) { host.appendChild(h('div', { class: 'empty' }, 'No requests yet.')); return; }
+    state.log.forEach((e) => {
+      const r = e.r; const cls = r.status === 0 ? 'bad' : r.status < 300 ? 'ok' : r.status < 500 ? 'warn' : 'bad';
+      host.appendChild(h('div', { class: 'logrow', onclick: () => { const b = h('div', {}, h('div', { class: 'pathline' }, e.method + ' ' + e.url), h('div', { class: 'small muted' }, 'as ' + (e.who || 'anonymous') + ', ' + r.ms + ' ms, status ' + r.status), e.note ? h('div', { class: 'small muted' }, e.note) : null, h('div', { class: 'grp' }, 'Request body'), jsonNode(e.reqBody == null ? '(none)' : e.reqBody), h('div', { class: 'grp' }, 'Response'), jsonNode(r.data != null ? r.data : (r.text || r.error || '(empty)'))); openDrawer('Request detail', null, b); } },
+        h('span', { class: 'badge m-' + e.method }, e.method), h('div', {}, h('div', { class: 'u' }, e.url.replace(/^https?:\/\/[^/]+/, '')), h('div', { class: 's' }, e.at.toLocaleTimeString() + ' - ' + (e.who || 'anonymous') + ' - ' + e.svc)), h('span', { class: 'pill ' + cls }, r.status || 'ERR')));
+    });
+  };
+  draw(); onPage('log', draw);
+  root.appendChild(pageHead('Tools', 'Request log', 'The last 150 calls this console made, newest first. Click one to see what was sent and what came back.', h('button', { class: 'btn ghost', onclick: () => { state.log = []; draw(); document.dispatchEvent(new CustomEvent('log')); } }, 'Clear')));
+  root.appendChild(h('div', { class: 'card' }, host));
+  return root;
+}
+
+function settingsPage() {
+  const root = h('div', { class: 'stack' });
+  root.appendChild(pageHead('Tools', 'Settings', 'Where the services live, how the console looks, and what it remembers.'));
+  const seg = h('div', { class: 'seg' }, ['light', 'dark'].map((t) => h('button', { class: state.theme === t ? 'on' : '', onclick: () => { setTheme(t); [...seg.children].forEach((b) => b.classList.toggle('on', b.textContent === t)); } }, t)));
+  root.appendChild(h('div', { class: 'grid g2' },
+    h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h3', {}, 'Service URLs')), h('div', { class: 'bd' }, connectionForm(), h('div', { class: 'note' }, 'The Property service defaults to port 8085. The Postman environment uses 8086, so set SERVER_PORT=8086 or change the URL here. The services only accept browser calls from http://localhost:3000, 4200 and 5173 by default, so serve this page on one of those ports.'), importEnvBtn())),
+    h('div', { class: 'card' }, h('div', { class: 'hd' }, h('h3', {}, 'Appearance and data')), h('div', { class: 'bd' }, h('div', { class: 'f' }, h('label', {}, 'Theme'), seg),
+      h('div', { class: 'f' }, h('label', {}, 'Saved context'), h('div', { class: 'row' }, h('button', { class: 'btn sm ghost', onclick: () => copyText(JSON.stringify(state.ctx, null, 2)) }, 'Copy as JSON'), h('button', { class: 'btn sm ghost', onclick: () => { state.ctx = {}; store.set('ctx', {}); document.dispatchEvent(new CustomEvent('ctx')); toast('Context cleared', 'ok'); } }, 'Clear ids'))),
+      h('div', { class: 'f' }, h('label', {}, 'Everything this console stores in the browser'), h('button', { class: 'btn sm danger', onclick: () => { ['cfg', 'sessions', 'active', 'ctx', 'presets', 'theme'].forEach((k) => store.del(k)); location.reload(); } }, 'Forget sessions, URLs and ids')),
+      h('div', { class: 'hint' }, 'Tokens are kept in this browser\'s local storage so a refresh keeps you signed in. This is a test tool: do not use it with real customer accounts on a shared computer.')))));
+  return root;
+}
+
+/* ---------- shell ---------- */
+let navEl, topEl, ctxEl, contentEl;
+function setTheme(t) { state.theme = t; store.set('theme', t); document.documentElement.setAttribute('data-theme', t); }
+async function pingAll() {
+  await Promise.all(['auth', 'property', 'wallet'].map(async (k) => {
+    const r = await call({ svc: k, method: 'GET', path: HEALTH[k], session: null, quiet: true });
+    state.health[k] = { status: r.status, ms: r.ms };
+  }));
+  document.dispatchEvent(new CustomEvent('health'));
+}
+function drawTop() {
+  if (!topEl) return;
+  topEl.innerHTML = '';
+  topEl.appendChild(h('button', { class: 'iconbtn menu-btn', onclick: () => $('.side').classList.toggle('open') }, ico('menu')));
+  ['auth', 'property', 'wallet'].forEach((k) => { const hh = state.health[k]; const cls = !hh ? '' : hh.status > 0 && hh.status < 300 ? 'up' : hh.status === 0 ? 'down' : 'warn'; topEl.appendChild(h('span', { class: 'chip', title: state.cfg[k] + (hh ? ' (' + (hh.status || 'unreachable') + ', ' + hh.ms + ' ms)' : ''), onclick: () => pingAll() }, h('span', { class: 'dot ' + cls }), h('span', { class: 'lbl' }, SVC_NAME[k]))); });
+  topEl.appendChild(h('span', { class: 'grow' }));
+  const s = activeSession();
+  topEl.appendChild(h('span', { class: 'chip', onclick: () => go('accounts') }, ico('user', 14), s ? h('span', {}, h('b', {}, s.email), ' ', h('span', { class: 'lbl' }, roleLabel(s))) : h('span', { class: 'lbl' }, 'Not signed in')));
+  topEl.appendChild(h('button', { class: 'iconbtn', title: 'Request log', onclick: () => go('log') }, ico('list'), h('span', { class: 'small' }, String(state.log.length))));
+  topEl.appendChild(h('button', { class: 'iconbtn', title: 'Switch theme', onclick: () => { setTheme(state.theme === 'dark' ? 'light' : 'dark'); drawTop(); } }, ico(state.theme === 'dark' ? 'sun' : 'moon')));
+}
+function drawCtx() {
+  if (!ctxEl) return;
+  ctxEl.innerHTML = '';
+  ctxEl.appendChild(h('span', { class: 'lbl' }, 'Context'));
+  const keys = MAIN_CTX.concat(Object.keys(state.ctx).filter((k) => !MAIN_CTX.includes(k) && k !== 'rental_unit_id' && k !== 'maintenance_request_id'));
+  keys.forEach((k) => { const v = state.ctx[k]; ctxEl.appendChild(h('span', { class: 'ctxchip' + (v ? ' set' : ''), title: v || 'not set', onclick: () => editCtx(k) }, k.replace(/_id$/, ''), h('span', {}, v ? (k === 'payment_reference' ? v.slice(0, 10) : v.slice(0, 4) + '...' + v.slice(-3)) : '-'))); });
+  ctxEl.appendChild(h('span', { class: 'ctxchip', onclick: editAllCtx }, 'all ids'));
+}
+function editCtx(k) {
+  const i = h('input', { class: 'fld', value: state.ctx[k] || '', placeholder: 'value' });
+  const m = openModal(k, h('div', {}, h('div', { class: 'f' }, h('label', {}, 'Value saved for ' + k), withFinder(i, k)), h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => { ctxSet(k, i.value.trim()); m.remove(); } }, 'Save'), h('button', { class: 'btn ghost', onclick: () => { ctxSet(k, ''); m.remove(); } }, 'Clear'))));
+  setTimeout(() => i.focus(), 30);
+}
+function editAllCtx() {
+  const ins = {}; const box = h('div');
+  ALL_CTX.forEach((k) => { ins[k] = h('input', { class: 'fld', value: state.ctx[k] || '' }); box.appendChild(h('div', { class: 'f' }, h('label', {}, k), withFinder(ins[k], k))); });
+  const m = openModal('All context ids', h('div', {}, box, h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => { Object.keys(ins).forEach((k) => { if ((state.ctx[k] || '') !== ins[k].value.trim()) ctxSet(k, ins[k].value.trim()); }); m.remove(); } }, 'Save'))));
+}
+function drawNav() {
+  if (!navEl) return;
+  const cur = (location.hash || '#/overview').slice(2);
+  navEl.innerHTML = '';
+  const item = (slug, name, icon, n) => h('a', { class: cur === slug ? 'on' : '', onclick: () => { $('.side').classList.remove('open'); go(slug); } }, ico(icon), name, n != null ? h('span', { class: 'n' }, String(n)) : null);
+  navEl.appendChild(h('h4', {}, 'Start'));
+  [['overview', 'Overview', 'home'], ['accounts', 'Accounts', 'user'], ['wallet', 'Wallet', 'wallet']].forEach((x) => navEl.appendChild(item(x[0], x[1], x[2])));
+  navEl.appendChild(h('h4', {}, 'Property service'));
+  SPEC.pages.forEach((p) => navEl.appendChild(item(p.slug, p.name, PAGE_ICON[p.name] || 'list', (PAGE_EP[p.name] || []).length)));
+  navEl.appendChild(h('h4', {}, 'Tools'));
+  [['all', 'All endpoints', 'list'], ['smoke', 'Smoke test', 'play'], ['log', 'Request log', 'clip'], ['settings', 'Settings', 'gear']].forEach((x) => navEl.appendChild(item(x[0], x[1], x[2])));
+}
+function route() {
+  if (!contentEl) return;
+  clearPageSubs(); closeDrawer();
+  const slug = (location.hash || '#/overview').slice(2) || 'overview';
+  let view;
+  const pg = SPEC.pages.find((p) => p.slug === slug);
+  if (pg) view = propertyPage(pg);
+  else if (slug === 'accounts') view = accountsPage();
+  else if (slug === 'wallet') view = walletPage();
+  else if (slug === 'all') view = allPage();
+  else if (slug === 'smoke') view = smokePage();
+  else if (slug === 'log') view = logPage();
+  else if (slug === 'settings') view = settingsPage();
+  else view = overviewPage();
+  contentEl.innerHTML = '';
+  contentEl.appendChild(h('div', { class: 'wrap' }, view));
+  contentEl.scrollTop = 0;
+  drawNav();
+}
+function renderApp() {
+  document.documentElement.setAttribute('data-theme', state.theme);
+  const root = $('#app'); root.innerHTML = '';
+  if (!state.sessions.length && !state.guest) { navEl = topEl = ctxEl = contentEl = null; root.appendChild(signinScreen()); return; }
+  navEl = h('div', { class: 'nav' }); topEl = h('div', { class: 'top' }); ctxEl = h('div', { class: 'ctxbar' }); contentEl = h('div', { class: 'content' });
+  root.appendChild(h('div', { class: 'app' },
+    h('aside', { class: 'side' }, h('div', { class: 'brandbar' }, h('div', { class: 'crest' }, ico('home', 16)), h('div', {}, h('b', {}, 'Premisave'), h('small', {}, 'Property console'))), navEl, h('div', { class: 'sidefoot' }, h('span', {}, 'Property service client'))),
+    h('div', { class: 'main' }, topEl, ctxEl, contentEl)));
+  drawTop(); drawCtx(); route();
+}
+document.addEventListener('ctx', drawCtx);
+document.addEventListener('sess', drawTop);
+document.addEventListener('log', drawTop);
+document.addEventListener('health', drawTop);
+window.addEventListener('hashchange', () => { if (contentEl) route(); });
+document.addEventListener('sess', () => { if (!state.sessions.length && !state.guest) renderApp(); });
+window.__pc = { state, call, ALL, route, renderApp, go, openEndpoint, ctxSet, addSession };
+renderApp();
+pingAll();
+setInterval(() => document.dispatchEvent(new CustomEvent('sess')), 60000);
+
+
+</script>
+</body>
+</html>
