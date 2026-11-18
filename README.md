@@ -1,92 +1,63 @@
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&amp;color=1A3C34&amp;height=240&amp;section=header&amp;text=Premisave%20Property%20Service&amp;fontSize=52&amp;fontColor=ffffff&amp;fontAlignY=34&amp;desc=Property%20lease%20tenant%20and%20rent%20management%20microservice&amp;descSize=18&amp;descAlignY=58&amp;animation=fadeIn" alt="Premisave Property Service - property, lease, tenant and rent management microservice banner" />
-</p>
+<div align="center">
 
-<h1 align="center">Premisave Property Management Service: Property, Lease &amp; Rent Management API</h1>
+<img src="docs/assets/banner.svg" alt="Premisave Property Management Service. From the first unit to the last notice." width="100%"/>
 
-<p align="center">
-  <b>A production-minded Spring Boot 4 &amp; MongoDB microservice that runs the property, lease, tenant, and rent side of the Premisave platform — with every rent and utility payment settled through the sibling wallet service, never a payment provider directly.</b>
-</p>
+<br/>
 
-<p align="center">
-  <a href="https://github.com/peacemakerbill">
-    <img src="https://avatars.githubusercontent.com/u/262163756?v=4&amp;s=200" width="110" height="110" alt="Bill Graham Peacemaker (peacemakerbill) GitHub profile picture" />
-  </a>
-  <br/>
-  <sub>Built by <a href="https://github.com/peacemakerbill"><b>Bill Graham Peacemaker</b></a> (<code>@peacemakerbill</code>) · Backend Developer &amp; API Support Engineer · Nairobi, Kenya</sub>
-</p>
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot 4.1](https://img.shields.io/badge/Spring_Boot-4.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![MongoDB Spring Data](https://img.shields.io/badge/MongoDB-Spring_Data-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![Redis Cache](https://img.shields.io/badge/Redis-Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
+[![RabbitMQ AMQP](https://img.shields.io/badge/RabbitMQ-AMQP-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com)
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&amp;logo=openjdk&amp;logoColor=white" alt="Java 21" />
-  <img src="https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?style=for-the-badge&amp;logo=springboot&amp;logoColor=white" alt="Spring Boot 4.1.1" />
-  <img src="https://img.shields.io/badge/Spring_Framework-7.0.9-6DB33F?style=for-the-badge&amp;logo=spring&amp;logoColor=white" alt="Spring Framework 7" />
-  <img src="https://img.shields.io/badge/Spring_Security-7-6DB33F?style=for-the-badge&amp;logo=springsecurity&amp;logoColor=white" alt="Spring Security 7" />
-  <img src="https://img.shields.io/badge/MongoDB-Spring_Data-47A248?style=for-the-badge&amp;logo=mongodb&amp;logoColor=white" alt="MongoDB with Spring Data" />
-  <img src="https://img.shields.io/badge/Redis-Cache-DC382D?style=for-the-badge&amp;logo=redis&amp;logoColor=white" alt="Redis cache" />
-  <img src="https://img.shields.io/badge/RabbitMQ-AMQP-FF6600?style=for-the-badge&amp;logo=rabbitmq&amp;logoColor=white" alt="RabbitMQ" />
-  <img src="https://img.shields.io/badge/Maven-Build-C71A36?style=for-the-badge&amp;logo=apachemaven&amp;logoColor=white" alt="Apache Maven" />
-</p>
+![Maven Wrapper](https://img.shields.io/badge/Maven-Wrapper-C71A36?style=flat-square&logo=apachemaven&logoColor=white)
+![MapStruct Mapping](https://img.shields.io/badge/MapStruct-Mapping-0E3B2F?style=flat-square)
+![OpenAPI Swagger UI](https://img.shields.io/badge/OpenAPI-Swagger_UI-85EA2D?style=flat-square&logo=swagger&logoColor=white)
+![License Proprietary](https://img.shields.io/badge/License-Proprietary-C0392B?style=flat-square)
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Leases_%26_Occupancy-UNIT_%2F_WHOLE__PROPERTY-1A3C34?style=for-the-badge" alt="Lease and occupancy management" />
-  <img src="https://img.shields.io/badge/Rent_%26_Utility_Billing-USD-C9A84C?style=for-the-badge" alt="Rent and utility billing in USD" />
-  <img src="https://img.shields.io/badge/Payments-via_Wallet_Service-635BFF?style=for-the-badge" alt="Payments settled via the wallet service" />
-  <img src="https://img.shields.io/badge/OpenFeign-Service_to_Service-6DB33F?style=for-the-badge" alt="OpenFeign service-to-service calls" />
-  <img src="https://img.shields.io/badge/OpenAPI-3-85EA2D?style=for-the-badge&amp;logo=swagger&amp;logoColor=white" alt="OpenAPI 3 / Swagger UI" />
-</p>
+[![Last commit](https://img.shields.io/github/last-commit/peacemakerbill/premisave-property-management-service?style=flat-square&color=14493B)](https://github.com/peacemakerbill/premisave-property-management-service/commits/main)
+[![Stars](https://img.shields.io/github/stars/peacemakerbill/premisave-property-management-service?style=flat-square&color=14493B)](https://github.com/peacemakerbill/premisave-property-management-service/stargazers)
+[![Issues](https://img.shields.io/github/issues/peacemakerbill/premisave-property-management-service?style=flat-square&color=14493B)](https://github.com/peacemakerbill/premisave-property-management-service/issues)
+[![Frontend](https://img.shields.io/badge/frontend-premisave__flutter__frontend-0E3B2F?style=flat-square&logo=flutter&logoColor=E3A72F)](https://github.com/peacemakerbill/premisave_flutter_frontend)
 
-<p align="center">
-  <a href="https://github.com/peacemakerbill/premisave-property-management-service/stargazers"><img src="https://img.shields.io/github/stars/peacemakerbill/premisave-property-management-service?style=for-the-badge&amp;logo=github" alt="GitHub stars" /></a>
-  <a href="https://github.com/peacemakerbill/premisave-property-management-service/network/members"><img src="https://img.shields.io/github/forks/peacemakerbill/premisave-property-management-service?style=for-the-badge&amp;logo=github" alt="GitHub forks" /></a>
-  <a href="https://github.com/peacemakerbill/premisave-property-management-service/issues"><img src="https://img.shields.io/github/issues/peacemakerbill/premisave-property-management-service?style=for-the-badge" alt="Open issues" /></a>
-  <a href="https://github.com/peacemakerbill/premisave-property-management-service/commits"><img src="https://img.shields.io/github/last-commit/peacemakerbill/premisave-property-management-service?style=for-the-badge" alt="Last commit" /></a>
-  <img src="https://img.shields.io/github/repo-size/peacemakerbill/premisave-property-management-service?style=for-the-badge" alt="Repository size" />
-  <img src="https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge" alt="Proprietary license" />
-  <img src="https://img.shields.io/badge/Made_in-Nairobi,_Kenya-000000?style=for-the-badge" alt="Made in Nairobi, Kenya" />
-</p>
+**[Quick start](#quick-start)** &nbsp;|&nbsp; **[Where it sits](#where-it-sits)** &nbsp;|&nbsp; **[Flutter app](#connected-to-the-flutter-app)** &nbsp;|&nbsp; **[Architecture](#architecture)** &nbsp;|&nbsp; **[Rent payments](#how-a-rent-payment-works)** &nbsp;|&nbsp; **[Configuration](#configuration-reference)** &nbsp;|&nbsp; **[Troubleshooting](#troubleshooting)**
 
-<p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#architecture">Architecture</a> ·
-  <a href="#how-a-rent-payment-works">How a rent payment works</a> ·
-  <a href="#service-availability-and-resilience">Service availability</a> ·
-  <a href="#api-reference">API reference</a> ·
-  <a href="#configuration-reference">Configuration</a> ·
-  <a href="#troubleshooting">Troubleshooting</a> ·
-  <a href="#known-limits">Known limits</a>
-</p>
+</div>
+
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
 
 > **If this saves you time building a property/lease domain service in Java, please star the repo.** It helps other Kenyan fintech and proptech developers find it.
 
 > **Disclaimer.** This is an independent, community-built project shared as a portfolio and reference implementation. It is not an official product of, and is not affiliated with or endorsed by, Safaricom or any payment provider. This service never talks to M-Pesa, Stripe, PayPal, Flutterwave, or NOWPayments directly — every payment is settled by the sibling [Premisave Wallet Service](https://github.com/peacemakerbill/premisave-wallet-service), which owns that integration surface. M-PESA is a trademark of Safaricom PLC.
 
----
+## Contents
 
-## Table of contents
+- [What is this?](#what-is-this)
+- [Features](#features)
+- [Architecture](#architecture)
+- [How a rent payment works](#how-a-rent-payment-works)
+- [Service availability and resilience](#service-availability-and-resilience)
+- [Currency and payment model](#currency-and-payment-model)
+- [Where it sits](#where-it-sits)
+- [A request, step by step](#a-request-step-by-step)
+- [Connected to the Flutter app](#connected-to-the-flutter-app)
+- [Quick start](#quick-start)
+- [Build and run](#build-and-run)
+- [Configuration reference](#configuration-reference)
+- [API reference](#api-reference)
+- [Testing with curl](#testing-with-curl)
+- [Data model](#data-model)
+- [Going live](#going-live)
+- [Security notes](#security-notes)
+- [Project structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Upgrading from earlier deliveries](#upgrading-from-earlier-deliveries)
+- [Known limits](#known-limits)
+- [Roadmap ideas](#roadmap-ideas)
+- [Contributing](#contributing)
+- [Author](#author)
 
-1. [What is this?](#what-is-this)
-2. [Features](#features)
-3. [Architecture](#architecture)
-4. [How a rent payment works](#how-a-rent-payment-works)
-5. [Service availability and resilience](#service-availability-and-resilience)
-6. [Currency and payment model](#currency-and-payment-model)
-7. [Quick start](#quick-start)
-8. [Build and run](#build-and-run)
-9. [Configuration reference](#configuration-reference)
-10. [API reference](#api-reference)
-11. [Testing with curl](#testing-with-curl)
-12. [Data model](#data-model)
-13. [Going live](#going-live)
-14. [Security notes](#security-notes)
-15. [Project structure](#project-structure)
-16. [Troubleshooting](#troubleshooting)
-17. [Upgrading from earlier deliveries](#upgrading-from-earlier-deliveries)
-18. [Known limits](#known-limits)
-19. [Roadmap ideas](#roadmap-ideas)
-20. [Contributing](#contributing)
-21. [Author](#author)
-
----
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
 
 ## What is this?
 
@@ -185,6 +156,116 @@ Every endpoint that depends on auth-service or the wallet service is annotated t
 - **This service moves no money itself.** A payment request results in exactly one wallet-service transfer call; this service only ever books the *result* of that transfer against a lease, a unit's balance, a deposit, or a bill.
 - **Amounts have at most 2 decimal places** and must be positive. Bills generated from a meter reading are rounded half up to the cent.
 - **Idempotency**: every payment accepts an optional caller-supplied `reference`. Retrying with the same one is guaranteed safe — it returns the original result rather than moving money again — tracked via a unique-indexed `wallet_transfers` collection.
+
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
+
+## Where it sits
+
+<img src="docs/assets/services.svg" alt="The Flutter app on the left and the seven Premisave services on the right with their ports and the setting that holds each address. This service is picked out." width="100%"/>
+
+The property service owns properties, units, leases, rent and maintenance. The Flutter app uses it for both sides of a tenancy, and it asks the wallet service to move rent and the auth-service to know who is who.
+
+| Caller | What for | Proves who it is with |
+| --- | --- | --- |
+| Flutter app | Property management (owners) and My tenancy (tenants) | the person's bearer token |
+| wallet-service | called by this service for every rent payment | `X-API-Key` internal key |
+| auth-service | called by this service for profiles | `X-API-Key` internal key |
+
+It listens on port **8085**. The Flutter app finds it with the setting `PROPERTY_URL`.
+
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
+
+## A request, step by step
+
+<img src="docs/assets/flow.svg" alt="The request the Flutter app makes, step by step, and who answers each step." width="100%"/>
+
+Rent is a wallet to wallet transfer made by this service, with one reference per payment. If the wallet or the auth-service is down the answer says so in plain words, and the app shows that message.
+
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
+
+## Connected to the Flutter app
+
+<img src="docs/assets/connect.svg" alt="A screen asks a provider, which asks the repository, which uses the API client to call this service." width="100%"/>
+
+The Flutter app's **Property management** screen (home owners) and **My tenancy** screen (clients) use this service.
+
+The code is in [`premisave_flutter_frontend`](https://github.com/peacemakerbill/premisave_flutter_frontend): the repository class is `lib/src/data/repositories/property_repository.dart`, the providers are in `lib/src/state`, and every call below goes through one client built for this service.
+
+### What the app does with it
+
+| Screen | What it does | Calls |
+| --- | --- | --- |
+| Property management | Dashboard, properties and their units, leases, maintenance requests and their status | `GET /api/v1/owners/me/exists`, `POST /api/v1/owners/quick`, `GET /api/v1/dashboard/owner`, `GET /api/v1/properties/me`, `GET /api/v1/units/property/{id}`, `GET /api/v1/leases/owner`, `GET /api/v1/maintenance`, `PATCH /api/v1/maintenance/{id}/status` |
+| My tenancy | Rent balance, leases, notices, maintenance requests, paying rent | `GET /api/v1/tenants/me`, `POST /api/v1/tenants/quick-register`, `GET /api/v1/rent/balance/me`, `GET /api/v1/leases/tenant/{id}`, `GET /api/v1/maintenance/tenant/{id}`, `POST /api/v1/maintenance`, `GET /api/v1/notices/tenant/{id}`, `GET /api/v1/rent/units/due/{id}`, `POST /api/v1/rent/units/pay`, `POST /api/v1/rent/pay` |
+
+- A person with no owner or tenant profile is offered a one tap profile first (`POST /api/v1/owners/quick`, `POST /api/v1/tenants/quick-register`).
+- Answers are plain bodies, not an envelope.
+- The service sends no currency for rent. Its money is USD, matching the wallet service, so the app shows USD.
+- The home owner overview reads `GET /api/v1/owners/me/exists`, `GET /api/v1/dashboard/owner` and `GET /api/v1/leases/owner`: monthly rent, occupancy per property, waiting maintenance requests and leases that end soon.
+
+### Settings
+
+In the Flutter app, in `config/env/*.json` or passed with `--dart-define`:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `PROPERTY_URL` | `http://localhost:8085`, or `http://10.0.2.2:8085` on the Android emulator | Where this service lives, with no trailing slash |
+
+On a real phone `localhost` is the phone itself, so use the computer's address on the network. Flutter reads these values only at launch: stop the app and run it again after a change.
+
+In this service's `.env`:
+
+| Variable | Why the app cares |
+| --- | --- |
+| `JWT_SECRET` | Must equal the auth-service value |
+| `CORS_ALLOWED_ORIGINS` | Browser origins that may call this service |
+| `AUTH_SERVICE_URL` | Where profiles are fetched |
+| `WALLET_SERVICE_URL` | Where rent is paid |
+| `INTERNAL_API_KEY` | Shared with the other services |
+
+### Signing and tokens
+
+The app sends `Authorization: Bearer <access token>`. It leaves out the device headers (`X-Client-Platform`, `X-Device-Token`) that only the auth-service reads. The service checks the signature with the same `JWT_SECRET` as the auth-service and reads the user from the claims, so **the two values must be identical**. When the access token has expired the app asks the auth-service for a new one and sends the request again, so this service never sees a refresh.
+
+### Browser rules (CORS)
+
+A phone or desktop build is not stopped by CORS. A browser is, so for the web build this service must allow the address the app is served from, which is `http://localhost:3000` in development.
+
+| Setting | Default | What to do |
+| --- | --- | --- |
+| `CORS_ALLOWED_ORIGINS` | http://localhost:3000, http://localhost:4200, http://localhost:5173 | A comma separated list. The Flutter web build on port 3000 is already allowed. |
+
+### Run it together
+
+Each command is run in its own terminal. Start the services this one needs first.
+
+```bash
+# 1. premisave_auth_service
+cd ~/MyProjects/premisave/premisave_auth_service && ./mvnw spring-boot:run
+
+# 2. premisave-wallet-service
+cd ~/MyProjects/premisave/premisave-wallet-service && ./mvnw spring-boot:run
+
+# 3. this service
+cd ~/MyProjects/premisave/premisave-property-management-service && ./mvnw spring-boot:run
+
+# 4. the app, on the port the backends allow for browsers
+cd ~/MyProjects/premisave/premisave_flutter_frontend
+flutter run -d chrome --web-port=3000 --dart-define-from-file=config/env/dev.local.json
+```
+
+Leave `PROPERTY_URL` empty in the app's file and it finds this service on `localhost:8085`. The same walk through for every service is in [the app's docs](https://github.com/peacemakerbill/premisave_flutter_frontend/blob/main/docs/SERVICES.md).
+
+### If it does not connect
+
+| You see | Likely cause | Do this |
+| --- | --- | --- |
+| My tenancy says there is no profile | The person has not registered as a tenant yet | Tap the register button, it calls `POST /api/v1/tenants/quick-register` |
+| Paying rent says a service is offline | The wallet or the auth-service is down | Start them. The message names the one that is missing |
+| "Could not reach the server" | The service is not running, or `PROPERTY_URL` points elsewhere | Start it, or set `PROPERTY_URL` and restart the app |
+| 401 straight after signing in | `JWT_SECRET` differs from the auth-service | Copy the auth-service value into this service's `.env` |
+
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
 
 ## Quick start
 
@@ -660,7 +741,7 @@ Found a bug or have an integration question? [Open an issue](https://github.com/
   <img src="https://api.star-history.com/svg?repos=peacemakerbill/premisave-property-management-service&amp;type=Date" alt="Star history chart for premisave-property-management-service" width="600" />
 </a>
 
----
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
 
 <details>
 <summary>Search keywords</summary>
