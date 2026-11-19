@@ -586,7 +586,7 @@ premisave-property-management-service/
 │   └── PremisavePropertyManagementApplication.java
 ├── src/main/resources/
 │   ├── application.yml
-│   └── templates/email/   # Thymeleaf HTML email templates
+│   └── templates/email/   # Thymeleaf HTML email templates (fragments.html holds the shared header, footer and styles, in the auth service design)
 └── pom.xml
 ```
 
