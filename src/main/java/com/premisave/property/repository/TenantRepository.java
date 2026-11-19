@@ -4,6 +4,7 @@ import com.premisave.property.entity.Tenant;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -14,4 +15,7 @@ public interface TenantRepository extends MongoRepository<Tenant, String> {
     Optional<Tenant> findByIdNumber(String idNumber);
 
     Optional<Tenant> findByEmail(String email);
+
+    List<Tenant> findTop10ByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCaseOrPhoneNumberContaining(
+            String name, String email, String phone);
 }

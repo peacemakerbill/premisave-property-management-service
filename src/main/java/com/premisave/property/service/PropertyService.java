@@ -98,6 +98,28 @@ public class PropertyService {
         if (request.getIsActive() != null) {
             property.setIsActive(request.getIsActive());
         }
+        if (request.getPropertyType() != null) {
+            property.setPropertyType(request.getPropertyType());
+        }
+        if (request.getAddress() != null) {
+            property.setAddress(mergeAddress(property.getAddress(), request.getAddress()));
+        }
+        if (request.getLatitude() != null && request.getLongitude() != null) {
+            GeoLocation location = new GeoLocation();
+            location.setLatitude(request.getLatitude());
+            location.setLongitude(request.getLongitude());
+            property.setLocation(location);
+        }
+        if (request.getRegistrationType() != null) {
+            property.setRegistrationType(request.getRegistrationType());
+        }
+        String number = request.getRegistrationNumber();
+        if (number != null && !number.isBlank() && !number.equals(property.getRegistrationNumber())) {
+            if (propertyRepository.existsByRegistrationNumber(number)) {
+                throw new ConflictException("A property with this registration number is already registered");
+            }
+            property.setRegistrationNumber(number);
+        }
 
         return toResponse(propertyRepository.save(property));
     }
@@ -141,6 +163,19 @@ public class PropertyService {
         address.setState(request.getState());
         address.setCountry(request.getCountry());
         address.setPostalCode(request.getPostalCode());
+        address.setLandmark(request.getLandmark());
+        return address;
+    }
+
+    /** Keeps what the request leaves out, so a partial address does not wipe the rest. */
+    private Address mergeAddress(Address current, AddressRequest request) {
+        Address address = current != null ? current : new Address();
+        if (request.getStreet() != null) address.setStreet(request.getStreet());
+        if (request.getCity() != null) address.setCity(request.getCity());
+        if (request.getState() != null) address.setState(request.getState());
+        if (request.getCountry() != null) address.setCountry(request.getCountry());
+        if (request.getPostalCode() != null) address.setPostalCode(request.getPostalCode());
+        if (request.getLandmark() != null) address.setLandmark(request.getLandmark());
         return address;
     }
 

@@ -6,6 +6,7 @@ import com.premisave.property.dto.request.UpdateTenantRequest;
 import com.premisave.property.dto.response.AddressResponse;
 import com.premisave.property.dto.response.ProfileSyncStatusResponse;
 import com.premisave.property.dto.response.TenantResponse;
+import com.premisave.property.dto.response.TenantSummary;
 import com.premisave.property.dto.response.UserDto;
 import com.premisave.property.entity.Address;
 import com.premisave.property.entity.Tenant;
@@ -183,6 +184,36 @@ public class TenantService {
             throw new BadRequestException(
                     "Your account is missing a phone number. Please update your profile before continuing.");
         }
+    }
+
+    /** Finds tenants by part of a name, email or phone number. Needs at least three characters and returns ten at most. */
+    public List<TenantSummary> search(String term) {
+        String q = term == null ? "" : term.trim();
+        if (q.length() < 3) {
+            return List.of();
+        }
+        return tenantRepository
+                .findTop10ByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCaseOrPhoneNumberContaining(q, q, q)
+                .stream()
+                .map(t -> new TenantSummary(t.getId(), t.getFullName(), maskEmail(t.getEmail()), maskPhone(t.getPhoneNumber()),
+                        t.getIsBlacklisted()))
+                .toList();
+    }
+
+    private static String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return email;
+        }
+        int at = email.indexOf('@');
+        String name = email.substring(0, at);
+        return (name.length() <= 2 ? name.substring(0, Math.min(1, name.length())) : name.substring(0, 2)) + "..." + email.substring(at);
+    }
+
+    private static String maskPhone(String phone) {
+        if (phone == null || phone.length() < 5) {
+            return phone;
+        }
+        return phone.substring(0, 4) + "..." + phone.substring(phone.length() - 2);
     }
 
     public TenantResponse getTenantById(String id) {

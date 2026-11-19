@@ -4,6 +4,7 @@ import com.premisave.property.dto.request.TenantRegistrationRequest;
 import com.premisave.property.dto.request.UpdateTenantRequest;
 import com.premisave.property.dto.response.ProfileSyncStatusResponse;
 import com.premisave.property.dto.response.TenantResponse;
+import com.premisave.property.dto.response.TenantSummary;
 import com.premisave.property.security.AccessGuard;
 import com.premisave.property.service.TenantService;
 import com.premisave.property.health.ExternalService;
@@ -12,7 +13,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/tenants")
@@ -75,6 +79,13 @@ public class TenantController {
                                                                   HttpServletRequest httpRequest) {
         String userId = resolveUserId(httpRequest);
         return ResponseEntity.ok(tenantService.updateTenantByUserId(request, userId));
+    }
+
+    /** Owners look up the person they are about to lease to by name, email or phone, instead of typing an id. */
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('HOME_OWNER','ADMIN')")
+    public ResponseEntity<List<TenantSummary>> search(@RequestParam String q) {
+        return ResponseEntity.ok(tenantService.search(q));
     }
 
     @GetMapping("/{id}")
